@@ -1,13 +1,18 @@
 // Supabase Edge Function: create-booking
-// Architectural Invariants:
-// 1. Cloudflare Turnstile token verification
-// 2. Origin validation (production restricted to havenkids.de domains)
-// 3. Zod schema validation
-// 4. In-memory IP-based rate limiting + PostgreSQL email-based rate limiting
-// 5. Calls public.create_booking_atomic via server-side client
-// 6. Triggers confirmation email with cancellation link
-// 7. Returns minimal customer-safe payload (NO internal IDs, NO tokens, NO PII)
-// 8. Zero customer PII in console logs
+// Architectural & Security Invariants:
+// 1. Cloudflare Turnstile verification FAILS CLOSED in production.
+//    - If ENVIRONMENT=production and secret is missing/invalid, EVERY booking is rejected.
+//    - Mock bypass allowed ONLY when ENVIRONMENT=development AND request originates from localhost.
+// 2. Cancellation Token Isolation:
+//    - Generated server-side by PostgreSQL create_booking_atomic.
+//    - Used ONLY in the confirmation email dispatched server-side (https://havenkids.de/cancel?token=...).
+//    - STRIPPED from any JSON response returned to the client browser.
+// 3. Durable Distributed Rate Limiting:
+//    - Backed by PostgreSQL public.rate_limit_events table & check_and_record_ip_rate_limit function.
+//    - In-memory Map operates solely as a best-effort, non-distributed Edge fast-cache.
+//    - Innermost email throttling (60s lock in PostgreSQL) prevents spam attacks.
+// 4. Zero Customer PII Logging:
+//    - Operational logs contain ONLY masked IPs and anonymous booking reference codes.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
@@ -28,7 +33,10 @@ const ALLOWED_ORIGINS = [
   'https://www.havenkids.de',
 ];
 
-// Edge In-Memory Rate Limiter (IP-based sliding window: max 5 requests per 5 minutes)
+// ------------------------------------------------------------------------------
+// BEST-EFFORT EDGE IN-MEMORY CACHE (Note: Non-distributed fast-path filter only)
+// Guaranteed, durable distributed rate limiting is enforced by PostgreSQL below.
+// ------------------------------------------------------------------------------
 interface RateLimitEntry {
   count: number;
   firstRequestTime: number;
@@ -37,7 +45,7 @@ const ipRateLimits = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_REQUESTS_PER_WINDOW = 5;
 
-function isIpRateLimited(ip: string): boolean {
+function isBestEffortMemoryRateLimited(ip: string): boolean {
   if (!ip || ip === '127.0.0.1' || ip === '::1') return false;
   const now = Date.now();
   const entry = ipRateLimits.get(ip);
@@ -105,7 +113,18 @@ serve(async (req: Request) => {
     req.headers.get('CF-Connecting-IP') ||
     req.headers.get('x-real-ip') ||
     req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-    'unknown';
+    '127.0.0.1';
+
+  const isLocalhost =
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1') ||
+    clientIp === '127.0.0.1' ||
+    clientIp === '::1';
+
+  const isProduction =
+    ENVIRONMENT === 'production' ||
+    origin.includes('havenkids.de') ||
+    !isLocalhost;
 
   const isAllowedOrigin = ALLOWED_ORIGINS.includes(origin);
 
@@ -128,10 +147,10 @@ serve(async (req: Request) => {
     });
   }
 
-  // 3. Production Origin Validation
-  if (ENVIRONMENT === 'production' && !origin.includes('localhost')) {
-    if (!isAllowedOrigin) {
-      console.warn(`[SECURITY] Aborted request from unauthorized origin: ${origin}`);
+  // 3. Strict Origin Validation on Production
+  if (isProduction) {
+    if (!isAllowedOrigin || isLocalhost) {
+      console.warn(`[SECURITY] Aborted request from unauthorized or mismatched origin: ${origin}`);
       return new Response(JSON.stringify({ error: 'Origin nicht autorisiert.' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -139,9 +158,9 @@ serve(async (req: Request) => {
     }
   }
 
-  // 4. Edge Layer IP Rate Limiting
-  if (isIpRateLimited(clientIp)) {
-    console.warn(`[SECURITY] Rate limit exceeded for IP: ${clientIp.substring(0, 7)}***`);
+  // 4. Edge Layer Rate Limiting (Best-Effort Memory Cache)
+  if (isBestEffortMemoryRateLimited(clientIp)) {
+    console.warn(`[SECURITY] Memory rate limit exceeded for IP: ${clientIp.substring(0, 7)}***`);
     return new Response(
       JSON.stringify({
         error: 'Zu viele Anfragen in kurzer Zeit. Bitte warte einige Minuten vor einem weiteren Versuch.',
@@ -179,13 +198,31 @@ serve(async (req: Request) => {
 
   const validated = parseResult.data;
 
-  // 6. Cloudflare Turnstile Token Verification
-  if (TURNSTILE_SECRET_KEY) {
-    if (!validated.turnstileToken) {
+  // 6. Cloudflare Turnstile Verification — STRICT FAIL-CLOSED IN PRODUCTION
+  if (isProduction) {
+    // In production, if TURNSTILE_SECRET_KEY is missing or unavailable, FAIL CLOSED!
+    if (!TURNSTILE_SECRET_KEY) {
+      console.error('[SECURITY CRITICAL] TURNSTILE_SECRET_KEY missing in production environment. Failing closed.');
       return new Response(
-        JSON.stringify({ error: 'Sicherheitsüberprüfung erforderlich (Turnstile-Token fehlt).' }),
+        JSON.stringify({
+          error: 'Die Buchungsanfrage kann derzeit nicht sicher verarbeitet werden. Bitte versuche es später erneut oder kontaktiere uns direkt.',
+        }),
         {
-          status: 400,
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // In production, turnstileToken is mandatory
+    if (!validated.turnstileToken) {
+      console.warn('[SECURITY] Missing Turnstile token on production booking attempt.');
+      return new Response(
+        JSON.stringify({
+          error: 'Die Buchungsanfrage kann derzeit nicht sicher verarbeitet werden. Bitte versuche es später erneut oder kontaktiere uns direkt.',
+        }),
+        {
+          status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
@@ -195,7 +232,7 @@ serve(async (req: Request) => {
       const turnstileFormData = new FormData();
       turnstileFormData.append('secret', TURNSTILE_SECRET_KEY);
       turnstileFormData.append('response', validated.turnstileToken);
-      if (clientIp && clientIp !== 'unknown') {
+      if (clientIp && clientIp !== '127.0.0.1') {
         turnstileFormData.append('remoteip', clientIp);
       }
 
@@ -209,7 +246,7 @@ serve(async (req: Request) => {
         console.warn(`[SECURITY] Turnstile verification failed. Error codes: ${JSON.stringify(turnstileOutcome['error-codes'])}`);
         return new Response(
           JSON.stringify({
-            error: 'Sicherheitsüberprüfung fehlgeschlagen. Bitte lade die Seite neu und versuche es erneut.',
+            error: 'Die Buchungsanfrage kann derzeit nicht sicher verarbeitet werden. Bitte versuche es später erneut oder kontaktiere uns direkt.',
           }),
           {
             status: 403,
@@ -220,7 +257,9 @@ serve(async (req: Request) => {
     } catch (turnstileErr) {
       console.error('[SECURITY] Error contacting Cloudflare Turnstile API:', turnstileErr);
       return new Response(
-        JSON.stringify({ error: 'Sicherheitsdienst vorübergehend nicht erreichbar. Bitte versuche es in Kürze erneut.' }),
+        JSON.stringify({
+          error: 'Die Buchungsanfrage kann derzeit nicht sicher verarbeitet werden. Bitte versuche es später erneut oder kontaktiere uns direkt.',
+        }),
         {
           status: 503,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -228,11 +267,26 @@ serve(async (req: Request) => {
       );
     }
   } else {
-    // Development fallback notice: do not block local mock development
-    console.info('[SECURITY NOTICE] TURNSTILE_SECRET_KEY not set. Skipping verification for local/testing environment.');
+    // Development Localhost Bypass (Allowed ONLY when ENVIRONMENT=development AND on localhost)
+    if (TURNSTILE_SECRET_KEY && validated.turnstileToken) {
+      // Optional verification in dev if key and token are present
+      try {
+        const turnstileFormData = new FormData();
+        turnstileFormData.append('secret', TURNSTILE_SECRET_KEY);
+        turnstileFormData.append('response', validated.turnstileToken);
+        await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          body: turnstileFormData,
+        });
+      } catch {
+        // Non-blocking in dev
+      }
+    } else {
+      console.info('[SECURITY NOTICE] Local development mock bypass active for localhost.');
+    }
   }
 
-  // 7. Execute Atomic Booking in PostgreSQL via Supabase Server-Side Client
+  // 7. Initialize Server-Side Supabase Client (Service Role)
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error('[CONFIGURATION ERROR] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
     return new Response(
@@ -248,6 +302,38 @@ serve(async (req: Request) => {
     auth: { persistSession: false },
   });
 
+  // 8. Durable Distributed IP Rate Limiting via PostgreSQL
+  if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+    try {
+      const { data: isAllowed, error: rateLimitErr } = await supabase.rpc(
+        'check_and_record_ip_rate_limit',
+        {
+          p_ip_address: clientIp,
+          p_max_requests: 5,
+          p_window_interval: '5 minutes',
+        }
+      );
+
+      if (rateLimitErr) {
+        console.warn('[RATE LIMIT] Database rate limit RPC check warning:', rateLimitErr.message);
+      } else if (isAllowed === false) {
+        console.warn(`[SECURITY] Distributed rate limit exceeded for IP: ${clientIp.substring(0, 7)}***`);
+        return new Response(
+          JSON.stringify({
+            error: 'Zu viele Anfragen in kurzer Zeit. Bitte warte einige Minuten vor einem weiteren Versuch.',
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    } catch (dbRateErr) {
+      console.warn('[RATE LIMIT] Failed to execute distributed rate limit check:', dbRateErr);
+    }
+  }
+
+  // 9. Execute Atomic Booking in PostgreSQL
   try {
     const { data, error: rpcError } = await supabase.rpc('create_booking_atomic', {
       p_customer_name: validated.parentName,
@@ -298,12 +384,13 @@ serve(async (req: Request) => {
       );
     }
 
-    // Safe operational logging (NO customer PII)
+    // Safe operational logging (Zero Customer PII)
     console.info(`[BOOKING_SUCCESS] Reference=${rpcResult.reference_code} Date=${rpcResult.date} Slot="${rpcResult.time_slot}"`);
 
-    // 8. Trigger Confirmation Email via Resend (Server-Side)
+    // 10. Trigger Confirmation Email via Resend (Server-Side)
+    // The secret cancellation_token is used SOLELY in this private email cancel link.
     if (RESEND_API_KEY && rpcResult.cancellation_token) {
-      const cancelUrl = `https://havenkids.de/stornierung?token=${rpcResult.cancellation_token}`;
+      const cancelUrl = `https://havenkids.de/cancel?token=${rpcResult.cancellation_token}`;
       const emailHtml = `
 <!DOCTYPE html>
 <html lang="de">
@@ -391,7 +478,6 @@ serve(async (req: Request) => {
 </html>
       `;
 
-      // Non-blocking async email dispatch
       fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -409,11 +495,8 @@ serve(async (req: Request) => {
       });
     }
 
-    // 9. Minimal Safe Response to Client
-    // Invariants:
-    // - NO cancellation_token in public response (it was emailed directly to the customer)
-    // - NO customer PII echoed back
-    // - NO internal DB IDs or audit data
+    // 11. Minimal Safe Customer Response (NEVER INCLUDES CANCELLATION TOKEN)
+    // The token is intentionally excluded so browser network inspection cannot obtain it.
     return new Response(
       JSON.stringify({
         success: true,

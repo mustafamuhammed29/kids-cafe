@@ -509,13 +509,68 @@ CREATE TRIGGER tr_bookings_updated_at
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- ==============================================================================
--- 11. HARDENED ROW LEVEL SECURITY (RLS) POLICIES
+-- 11. DISTRIBUTED RATE LIMITING (Durable Edge Throttling)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.rate_limit_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ip_address INET NOT NULL,
+    action VARCHAR(50) NOT NULL DEFAULT 'booking_attempt',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_limit_events_ip_created 
+    ON public.rate_limit_events (ip_address, created_at);
+
+-- Distributed IP Rate Limiter with Opportunistic 1-Hour Cleanup
+CREATE OR REPLACE FUNCTION public.check_and_record_ip_rate_limit(
+    p_ip_address INET,
+    p_max_requests INT DEFAULT 5,
+    p_window_interval INTERVAL DEFAULT INTERVAL '5 minutes'
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_recent_count INT;
+BEGIN
+    -- Opportunistic cleanup of expired events (older than 1 hour)
+    DELETE FROM public.rate_limit_events
+    WHERE created_at < (timezone('utc'::text, now()) - INTERVAL '1 hour');
+
+    -- Count attempts in active window
+    SELECT COUNT(*)
+    INTO v_recent_count
+    FROM public.rate_limit_events
+    WHERE ip_address = p_ip_address
+      AND created_at > (timezone('utc'::text, now()) - p_window_interval);
+
+    IF v_recent_count >= p_max_requests THEN
+        RETURN false; -- Rate limit exceeded
+    END IF;
+
+    -- Record current attempt
+    INSERT INTO public.rate_limit_events (ip_address)
+    VALUES (p_ip_address);
+
+    RETURN true; -- Allowed
+END;
+$$;
+
+-- Security: Revoke execute from PUBLIC, grant exclusively to service_role
+REVOKE ALL ON FUNCTION public.check_and_record_ip_rate_limit(INET, INT, INTERVAL) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.check_and_record_ip_rate_limit(INET, INT, INTERVAL) TO service_role;
+
+-- ==============================================================================
+-- 12. HARDENED ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
 ALTER TABLE public.staff_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.packages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.time_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rate_limit_events ENABLE ROW LEVEL SECURITY;
 
 -- ------------------------------------------------------------------------------
 -- A. Staff Members Policies
@@ -595,13 +650,13 @@ CREATE POLICY "Staff can write audit logs"
     WITH CHECK (public.is_staff(auth.uid()));
 
 -- ==============================================================================
--- 12. REALTIME SUBSCRIPTION REGISTRATION
+-- 13. REALTIME SUBSCRIPTION REGISTRATION
 -- ==============================================================================
 ALTER PUBLICATION supabase_realtime ADD TABLE public.time_slots;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
 
 -- ==============================================================================
--- 13. INITIAL SEED DATA (All 6 Packages)
+-- 14. INITIAL SEED DATA (All 6 Packages)
 -- ==============================================================================
 INSERT INTO public.packages (slug, name, subtitle, description, features, price_type, base_price, currency, cta_text, cta_action, is_visible, category, display_order)
 VALUES

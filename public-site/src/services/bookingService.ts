@@ -16,8 +16,6 @@ export interface SlotAvailability {
 export interface BookingSubmissionResult {
   success: boolean;
   referenceCode: string;
-  cancellationToken?: string;
-  bookingId?: string;
   error?: string;
 }
 
