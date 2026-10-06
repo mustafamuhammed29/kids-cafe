@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 60" fill="none">
+  <!-- Brand Icon -->
+  <rect x="4" y="6" width="48" height="48" rx="16" fill="#93B1A6" fill-opacity="0.25"/>
+  <circle cx="28" cy="30" r="14" stroke="#5C8374" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 4"/>
+  <path d="M22 26c0-3.3 2.7-6 6-6s6 2.7 6 6c0 4-6 9-6 9s-6-5-6-9z" fill="#FFD3B6"/>
+  <circle cx="28" cy="25" r="2.5" fill="#183D3D"/>
+  <path d="M37 16l2-2m-2 0l2 2" stroke="#5C8374" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Text Brand -->
+  <text x="64" y="34" font-family="'Outfit', sans-serif" font-size="24" font-weight="800" fill="#183D3D" letter-spacing="-0.5">Haven <tspan fill="#5C8374">Kids</tspan></text>
+  <text x="64" y="47" font-family="'Outfit', sans-serif" font-size="10" font-weight="700" fill="#93B1A6" letter-spacing="2">CAFÉ &amp; SALZRAUM</text>
+</svg>

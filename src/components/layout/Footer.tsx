@@ -1,5 +1,6 @@
 import React from 'react';
-import { Sparkles, MapPin, Phone, Mail, MessageCircle, Heart } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { MessageCircle, Heart, Lock } from 'lucide-react';
 import { BUSINESS_INFO } from '../../data/mockData';
 
 interface FooterProps {
@@ -9,19 +10,18 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onOpenLegal, onOpenBooking }) => {
   return (
-    <footer className="bg-[#183D3D] text-gray-200 pt-16 pb-12 border-t-4 border-[#93B1A6]">
+    <footer className="bg-[#183D3D] text-gray-200 pt-16 pb-24 sm:pb-12 border-t-4 border-[#93B1A6]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8 mb-12">
           {/* Brand Info */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-[#93B1A6]/20 flex items-center justify-center text-[#FFD3B6]">
-                <Sparkles className="w-5 h-5 text-[#93B1A6]" />
-              </div>
-              <span className="font-extrabold text-2xl text-white tracking-tight">
-                Haven <span className="text-[#93B1A6]">Kids</span>
-              </span>
-            </div>
+          <div className="space-y-4 lg:col-span-2">
+            <Link to="/" className="inline-block">
+              <img
+                src="/assets/logo.svg"
+                alt="Haven Kids Café Logo"
+                className="h-10 w-auto brightness-0 invert opacity-95"
+              />
+            </Link>
             <p className="text-sm text-gray-300 leading-relaxed max-w-sm">
               Das liebevolle Familien-Spielcafé in Berlin. Pädagogisch wertvolles Holzspielzeug, entspannender Salzraum und Specialty Coffee für Eltern (Kinder von 0 bis 8 Jahren).
             </p>
@@ -40,44 +40,49 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLegal, onOpenBooking }) =>
 
           {/* Quick Links */}
           <div>
-            <h3 className="text-white font-bold text-base mb-4 tracking-wide">Schnellzugriff</h3>
-            <ul className="space-y-2.5 text-sm text-gray-300">
+            <h3 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Navigation</h3>
+            <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
               <li>
-                <a href="#rules" className="hover:text-[#93B1A6] transition-colors">
-                  Konzept & Besuchsregeln
-                </a>
+                <Link to="/services" className="hover:text-[#93B1A6] transition-colors">
+                  Angebote & Ausstattung
+                </Link>
               </li>
               <li>
-                <a href="#services" className="hover:text-[#93B1A6] transition-colors">
-                  Spielbereich, Salzraum & Café
-                </a>
+                <Link to="/pricing" className="hover:text-[#93B1A6] transition-colors">
+                  Preise & Pakete
+                </Link>
               </li>
               <li>
-                <a href="#pricing" className="hover:text-[#93B1A6] transition-colors">
-                  Eintrittspreise & 10er-Block
-                </a>
+                <Link to="/gallery" className="hover:text-[#93B1A6] transition-colors">
+                  Fotogalerie
+                </Link>
               </li>
               <li>
                 <button
                   type="button"
                   onClick={onOpenBooking}
-                  className="hover:text-[#93B1A6] transition-colors text-left font-semibold text-[#FFD3B6]"
+                  className="hover:text-[#93B1A6] transition-colors text-left font-semibold text-[#FFD3B6] cursor-pointer"
                 >
-                  Online-Reservierung
+                  Online reservieren
                 </button>
               </li>
               <li>
-                <a href="#faq" className="hover:text-[#93B1A6] transition-colors">
-                  Häufig gestellte Fragen (FAQ)
-                </a>
+                <Link to="/faq" className="hover:text-[#93B1A6] transition-colors">
+                  Häufige Fragen (FAQ)
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="hover:text-[#93B1A6] transition-colors">
+                  Kontakt & Anfahrt
+                </Link>
               </li>
             </ul>
           </div>
 
           {/* Opening Hours */}
           <div>
-            <h3 className="text-white font-bold text-base mb-4 tracking-wide">Öffnungszeiten</h3>
-            <ul className="space-y-2.5 text-sm text-gray-300">
+            <h3 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Öffnungszeiten</h3>
+            <ul className="space-y-2 text-xs text-gray-300">
               {BUSINESS_INFO.hours.map((h, i) => (
                 <li key={i} className="flex justify-between border-b border-gray-700/60 pb-1.5 gap-2">
                   <span className="text-gray-300">{h.days}</span>
@@ -85,48 +90,48 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLegal, onOpenBooking }) =>
                 </li>
               ))}
             </ul>
-            <p className="text-[12px] text-gray-400 mt-3 italic">
-              Einlass nur mit Vorab-Reservierung zur Vermeidung von Überfüllung.
+            <p className="text-[11px] text-gray-400 mt-2.5 italic">
+              Einlass nur mit Vorab-Reservierung.
             </p>
           </div>
 
-          {/* Contact Details */}
+          {/* Staff Login (Subtle) */}
           <div>
-            <h3 className="text-white font-bold text-base mb-4 tracking-wide">Standort & Kontakt</h3>
-            <ul className="space-y-3 text-sm text-gray-300">
-              <li className="flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 text-[#93B1A6] shrink-0 mt-0.5" />
-                <span>{BUSINESS_INFO.address}</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Phone className="w-4 h-4 text-[#93B1A6] shrink-0" />
-                <a href={`tel:${BUSINESS_INFO.phoneClean}`} className="hover:text-white transition-colors">
-                  {BUSINESS_INFO.phone}
-                </a>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Mail className="w-4 h-4 text-[#93B1A6] shrink-0" />
-                <a href={`mailto:${BUSINESS_INFO.email}`} className="hover:text-white transition-colors">
-                  {BUSINESS_INFO.email}
-                </a>
+            <h3 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Für Mitarbeiter</h3>
+            <ul className="space-y-2 text-xs text-gray-400">
+              <li>
+                <Link
+                  to="/admin-login"
+                  className="inline-flex items-center gap-1.5 text-gray-400 hover:text-[#93B1A6] transition-colors"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Admin Login</span>
+                </Link>
               </li>
             </ul>
+
+            <div className="mt-6 pt-4 border-t border-gray-700/60">
+              <h4 className="text-xs font-semibold text-gray-300 mb-2">Standort</h4>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                {BUSINESS_INFO.address}
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Disclaimer Bar */}
-        <div className="border-t border-gray-700/70 pt-6 pb-6 text-xs text-gray-400 leading-relaxed">
+        <div className="border-t border-gray-700/70 pt-5 pb-5 text-xs text-gray-400 leading-relaxed">
           <p>
             <strong className="text-gray-300">Rechtlicher Hinweis:</strong> {BUSINESS_INFO.medicalDisclaimer}
           </p>
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-gray-800 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-400">
-          <p className="flex items-center gap-1">
+        <div className="border-t border-gray-800 pt-5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-400">
+          <p className="flex items-center gap-1 text-center sm:text-left">
             &copy; 2026 {BUSINESS_INFO.name}. Alle Rechte vorbehalten. Gestaltet mit <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400 inline" /> für Familien.
           </p>
-          <div className="flex gap-6">
+          <div className="flex gap-5">
             <button
               type="button"
               onClick={() => onOpenLegal('impressum')}
@@ -146,7 +151,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLegal, onOpenBooking }) =>
               onClick={() => onOpenLegal('agb')}
               className="hover:text-[#93B1A6] transition-colors cursor-pointer"
             >
-              AGB & Besuchsbedingungen
+              AGB &amp; Regeln
             </button>
           </div>
         </div>

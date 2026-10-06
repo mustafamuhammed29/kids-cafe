@@ -65,18 +65,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
   // Price Calculation Logic
   const calculateTotal = (): number => {
+    const base = selectedService.basePrice || 0;
     if (selectedService.category === 'birthday') {
-      let total = selectedService.basePrice;
+      let total = base;
       if (includeSaltRoom) total += childrenCount * 5;
       return total;
     }
 
     if (selectedService.slug === '10er-block') {
-      return selectedService.basePrice;
+      return base;
     }
 
-    // Single visit: 14€ per child
-    let total = childrenCount * selectedService.basePrice;
+    // Single visit: base per child
+    let total = childrenCount * base;
     if (includeSaltRoom) {
       total += childrenCount * 5;
     }
@@ -190,7 +191,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Schließen"
-            className="p-2 rounded-xl text-gray-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
+            className="p-2 rounded-xl text-gray-300 hover:text-white hover:bg-white/10 transition cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <X className="w-5 h-5" />
           </button>
@@ -221,7 +222,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               </div>
 
               <div className="space-y-3.5">
-                {SERVICES.map((srv) => {
+                {SERVICES.filter((s) => s.packageCategory === 'standard').map((srv) => {
                   const isSelected = selectedService.id === srv.id;
 
                   return (
@@ -267,7 +268,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="bg-[#5C8374] hover:bg-[#183D3D] text-white px-7 py-3 rounded-full font-bold text-sm transition shadow-md flex items-center gap-2 cursor-pointer"
+                  className="bg-[#5C8374] hover:bg-[#183D3D] text-white px-7 py-3.5 rounded-full font-bold text-sm transition shadow-md flex items-center gap-2 cursor-pointer min-h-[44px]"
                 >
                   <span>Weiter zu Datum & Uhrzeit</span>
                   <ArrowRight className="w-4 h-4" />
@@ -299,7 +300,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   min={new Date().toISOString().split('T')[0]}
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold bg-white focus:ring-2 focus:ring-[#5C8374]"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold bg-white focus:ring-2 focus:ring-[#5C8374] min-h-[44px]"
                 />
                 <span className="text-[11px] text-gray-500 mt-1 block">
                   Hinweis: Sonntags Ruhetag (außer für geschlossene Geburtstagsgesellschaften).
@@ -322,7 +323,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       <div
                         key={slot.id}
                         onClick={() => setSelectedSlot(slot)}
-                        className={`p-4 rounded-2xl border-2 cursor-pointer transition text-center ${
+                        className={`p-4 rounded-2xl border-2 cursor-pointer transition text-center min-h-[80px] flex flex-col justify-center ${
                           isSelected
                             ? 'border-[#5C8374] bg-[#93B1A6]/15 shadow-sm'
                             : 'border-gray-200 hover:border-gray-300 bg-white'
@@ -334,7 +335,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                         <span className="text-[11px] text-[#5C8374] font-semibold block mt-1">
                           {freeSpots} Plätze frei
                         </span>
-                        <span className="text-[10px] text-gray-400 block mt-2 border-t border-gray-100 pt-1">
+                        <span className="text-[10px] text-gray-400 block mt-1 border-t border-gray-100 pt-1">
                           danach 30m Lüftung
                         </span>
                       </div>
@@ -347,7 +348,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="text-gray-600 hover:text-black font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                  className="text-gray-600 hover:text-black font-semibold text-xs flex items-center gap-1 cursor-pointer min-h-[44px] min-w-[44px]"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Zurück</span>
@@ -355,7 +356,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  className="bg-[#5C8374] hover:bg-[#183D3D] text-white px-7 py-3 rounded-full font-bold text-sm transition shadow-md flex items-center gap-2 cursor-pointer"
+                  className="bg-[#5C8374] hover:bg-[#183D3D] text-white px-7 py-3.5 rounded-full font-bold text-sm transition shadow-md flex items-center gap-2 cursor-pointer min-h-[44px]"
                 >
                   <span>Weiter zu Personen & Extras</span>
                   <ArrowRight className="w-4 h-4" />
@@ -384,14 +385,14 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       Anzahl Kinder (0–8 Jahre)
                     </label>
                     <span className="text-xs text-gray-500">
-                      Basispreis {selectedService.basePrice} € je Kind
+                      Basispreis {selectedService.basePrice || 14} € je Kind
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => handleChildrenCountChange(childrenCount - 1)}
-                      className="w-9 h-9 rounded-xl bg-white border border-gray-200 font-bold text-lg flex items-center justify-center hover:bg-gray-100 cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-white border border-gray-200 font-bold text-lg flex items-center justify-center hover:bg-gray-100 cursor-pointer min-h-[44px] min-w-[44px]"
                     >
                       -
                     </button>
@@ -401,7 +402,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                     <button
                       type="button"
                       onClick={() => handleChildrenCountChange(childrenCount + 1)}
-                      className="w-9 h-9 rounded-xl bg-white border border-gray-200 font-bold text-lg flex items-center justify-center hover:bg-gray-100 cursor-pointer"
+                      className="w-10 h-10 rounded-xl bg-white border border-gray-200 font-bold text-lg flex items-center justify-center hover:bg-gray-100 cursor-pointer min-h-[44px] min-w-[44px]"
                     >
                       +
                     </button>
@@ -411,7 +412,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 {/* Ages array */}
                 <div className="pt-3 border-t border-gray-200/80">
                   <span className="text-xs font-semibold text-gray-700 block mb-2">
-                    Alter der Kinder (zur optimalen Vorbereitung der Spielzonen):
+                    Alter der Kinder (zur Vorbereitung der Spielzonen):
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {childrenAges.map((age, idx) => (
@@ -420,7 +421,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                         <select
                           value={age}
                           onChange={(e) => handleAgeChange(idx, parseInt(e.target.value, 10))}
-                          className="w-full text-xs font-bold bg-transparent outline-hidden"
+                          className="w-full text-xs font-bold bg-transparent outline-hidden min-h-[36px]"
                         >
                           <option value={0}>Baby (&lt; 1 Jahr)</option>
                           <option value={1}>1 Jahr</option>
@@ -452,7 +453,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   <button
                     type="button"
                     onClick={() => setAdultsCount(Math.max(1, adultsCount - 1))}
-                    className="w-9 h-9 rounded-xl bg-white border border-gray-200 font-bold text-lg flex items-center justify-center hover:bg-gray-100 cursor-pointer"
+                    className="w-10 h-10 rounded-xl bg-white border border-gray-200 font-bold text-lg flex items-center justify-center hover:bg-gray-100 cursor-pointer min-h-[44px] min-w-[44px]"
                   >
                     -
                   </button>
@@ -462,7 +463,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   <button
                     type="button"
                     onClick={() => setAdultsCount(adultsCount + 1)}
-                    className="w-9 h-9 rounded-xl bg-white border border-gray-200 font-bold text-lg flex items-center justify-center hover:bg-gray-100 cursor-pointer"
+                    className="w-10 h-10 rounded-xl bg-white border border-gray-200 font-bold text-lg flex items-center justify-center hover:bg-gray-100 cursor-pointer min-h-[44px] min-w-[44px]"
                   >
                     +
                   </button>
@@ -517,7 +518,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="text-gray-600 hover:text-black font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                  className="text-gray-600 hover:text-black font-semibold text-xs flex items-center gap-1 cursor-pointer min-h-[44px] min-w-[44px]"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Zurück</span>
@@ -525,7 +526,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep(4)}
-                  className="bg-[#5C8374] hover:bg-[#183D3D] text-white px-7 py-3 rounded-full font-bold text-sm transition shadow-md flex items-center gap-2 cursor-pointer"
+                  className="bg-[#5C8374] hover:bg-[#183D3D] text-white px-7 py-3.5 rounded-full font-bold text-sm transition shadow-md flex items-center gap-2 cursor-pointer min-h-[44px]"
                 >
                   <span>Weiter zu Kontaktdaten</span>
                   <ArrowRight className="w-4 h-4" />
@@ -557,7 +558,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                     value={parentName}
                     onChange={(e) => setParentName(e.target.value)}
                     placeholder="z. B. Julia Schneider"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#5C8374]"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#5C8374] min-h-[44px]"
                   />
                 </div>
 
@@ -572,7 +573,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="julia.schneider@beispiel.de"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#5C8374]"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#5C8374] min-h-[44px]"
                     />
                   </div>
                   <div>
@@ -585,7 +586,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="+49 170 1234567"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#5C8374]"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#5C8374] min-h-[44px]"
                     />
                   </div>
                 </div>
@@ -599,7 +600,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                     value={specialRequests}
                     onChange={(e) => setSpecialRequests(e.target.value)}
                     placeholder="z. B. Hochstuhl benötigt, Allergien, Zwillingskinder..."
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#5C8374]"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#5C8374] min-h-[44px]"
                   />
                 </div>
               </div>
@@ -644,7 +645,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  className="text-gray-600 hover:text-black font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                  className="text-gray-600 hover:text-black font-semibold text-xs flex items-center gap-1 cursor-pointer min-h-[44px] min-w-[44px]"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Zurück</span>
@@ -652,7 +653,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="submit"
                   disabled={!acceptedRules}
-                  className="bg-[#5C8374] hover:bg-[#183D3D] disabled:opacity-50 text-white px-8 py-3.5 rounded-full font-extrabold text-sm transition shadow-lg flex items-center gap-2 cursor-pointer"
+                  className="bg-[#5C8374] hover:bg-[#183D3D] disabled:opacity-50 text-white px-8 py-3.5 rounded-full font-extrabold text-sm transition shadow-lg flex items-center gap-2 cursor-pointer min-h-[44px]"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Verbindlich reservieren</span>
@@ -732,17 +733,17 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="button"
                   onClick={generateIcsFile}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#183D3D] hover:bg-black text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#183D3D] hover:bg-black text-white text-xs font-bold transition shadow-sm cursor-pointer min-h-[44px]"
                 >
                   <Download className="w-4 h-4" />
                   <span>Termin im Kalender speichern (.ics)</span>
                 </button>
 
                 <a
-                  href={`https://wa.me/493012345678?text=Hallo%20Haven%20Kids%20Team%2C%20ich%20habe%20eine%20Frage%20zu%20meiner%20Buchung%20${confirmation.reference}.`}
+                  href={`https://wa.me/493012345678?text=Hallo%20Haven%20Kids%20Caf%C3%A9%20Team%2C%20ich%20habe%20eine%20Frage%20zu%20meiner%20Buchung%20${confirmation.reference}.`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm min-h-[44px]"
                 >
                   <MessageCircle className="w-4 h-4" />
                   <span>Frage per WhatsApp stellen</span>
@@ -758,7 +759,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="text-xs font-bold text-gray-500 hover:text-gray-800 cursor-pointer"
+                  className="text-xs font-bold text-gray-500 hover:text-gray-800 cursor-pointer min-h-[44px] min-w-[44px]"
                 >
                   Fenster schließen
                 </button>

@@ -38,7 +38,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Schließen"
-            className="p-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
           >
             <X className="w-5 h-5" />
           </button>
@@ -49,7 +49,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('impressum')}
-            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 min-h-[44px] ${
               activeTab === 'impressum'
                 ? 'border-[#5C8374] text-[#183D3D]'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -61,7 +61,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('datenschutz')}
-            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 min-h-[44px] ${
               activeTab === 'datenschutz'
                 ? 'border-[#5C8374] text-[#183D3D]'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -73,7 +73,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('agb')}
-            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 min-h-[44px] ${
               activeTab === 'agb'
                 ? 'border-[#5C8374] text-[#183D3D]'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
@@ -93,12 +93,12 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                 Angaben gemäß § 5 TMG / DDG
               </h3>
               <p>
-                <strong>Haven Kids Café GmbH (in Gründung)</strong><br />
+                <strong>{BUSINESS_INFO.name}</strong><br />
+                Inhaber: {BUSINESS_INFO.owner}<br />
                 {BUSINESS_INFO.address}<br />
                 Deutschland
               </p>
               <p>
-                <strong>Vertreten durch:</strong> Die Geschäftsführung<br />
                 <strong>Kontakt:</strong><br />
                 Telefon: {BUSINESS_INFO.phone}<br />
                 E-Mail: {BUSINESS_INFO.email}
@@ -125,7 +125,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </p>
               <h4 className="font-bold text-gray-900">1. Verantwortliche Stelle</h4>
               <p>
-                Verantwortlich für die Datenverarbeitung auf dieser Website ist Haven Kids Café, {BUSINESS_INFO.address}, E-Mail: {BUSINESS_INFO.email}.
+                Verantwortlich für die Datenverarbeitung auf dieser Website ist {BUSINESS_INFO.name}, Inhaber: {BUSINESS_INFO.owner}, {BUSINESS_INFO.address}, E-Mail: {BUSINESS_INFO.email}.
               </p>
               <h4 className="font-bold text-gray-900">2. Serverstandort & Hosting in der EU</h4>
               <p>
@@ -150,21 +150,21 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           {activeTab === 'agb' && (
             <div className="space-y-4 animate-fadeIn">
               <h3 className="font-extrabold text-base text-[#183D3D]">
-                Allgemeine Geschäfts- & Besuchsbedingungen (AGB)
+                Allgemeine Geschäfts- &amp; Besuchsbedingungen (AGB)
               </h3>
               <h4 className="font-bold text-gray-900">1. Geltungsbereich</h4>
               <p>
-                Diese Besuchsbedingungen gelten für den Aufenthalt und die Nutzung aller Spielbereiche, des Salzraums und des Cafés von Haven Kids Café.
+                Diese Besuchsbedingungen gelten für den Aufenthalt und die Nutzung aller Spielbereiche, des Salzraums und des Cafés von {BUSINESS_INFO.name}.
               </p>
               <h4 className="font-bold text-gray-900">2. Aufsichtspflicht der Begleitpersonen</h4>
               <p>
-                Haven Kids Café bietet keine Kinderbetreuung an. Die gesetzliche Aufsichtspflicht verbleibt während des gesamten Besuchs ausnahmslos bei den anwesenden Eltern oder erwachsenen Begleitpersonen.
+                {BUSINESS_INFO.name} bietet keine Kinderbetreuung an. Die gesetzliche Aufsichtspflicht verbleibt während des gesamten Besuchs ausnahmslos bei den anwesenden Eltern oder erwachsenen Begleitpersonen.
               </p>
-              <h4 className="font-bold text-gray-900">3. Sockenpflicht & Hygiene</h4>
+              <h4 className="font-bold text-gray-900">3. Sockenpflicht &amp; Hygiene</h4>
               <p>
                 Im gesamten Spiel- und Salzbereich gilt ausnahmslos Sockenpflicht für Kinder und Erwachsene. Das Betreten mit Straßenschuhen oder barfuß ist untersagt.
               </p>
-              <h4 className="font-bold text-gray-900">4. Gesundheit & ansteckende Krankheiten</h4>
+              <h4 className="font-bold text-gray-900">4. Gesundheit &amp; ansteckende Krankheiten</h4>
               <p>
                 Zum Schutz aller Gäste ist Kindern und Begleitpersonen mit ansteckenden Krankheiten (z. B. Magen-Darm-Infekte, Fieber, ansteckender Husten) der Zutritt untersagt. Buchungen können kostenfrei verlegt werden.
               </p>
@@ -172,7 +172,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               <p className="bg-sky-50 p-3 rounded-xl border border-sky-200 text-sky-900">
                 {BUSINESS_INFO.medicalDisclaimer}
               </p>
-              <h4 className="font-bold text-gray-900">6. Bezahlung & Stornierung</h4>
+              <h4 className="font-bold text-gray-900">6. Bezahlung &amp; Stornierung</h4>
               <p>
                 Die Vergütung erfolgt vor Ort beim Check-in. Reservierungen können bis zu 2 Stunden vor Beginn kostenfrei storniert oder umgebucht werden.
               </p>
@@ -185,7 +185,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="bg-[#183D3D] hover:bg-black text-white px-6 py-2.5 rounded-full text-xs font-bold transition cursor-pointer"
+            className="bg-[#183D3D] hover:bg-black text-white px-6 py-2.5 rounded-full text-xs font-bold transition cursor-pointer min-h-[40px]"
           >
             Schließen
           </button>

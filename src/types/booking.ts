@@ -1,20 +1,31 @@
-export type ServiceType = 'single' | 'pass_redemption' | 'birthday' | 'salt_room_only';
+export type ServiceType = 'single' | 'pass_redemption' | 'birthday' | 'salt_room_only' | 'group_party' | 'group_event' | 'corporate_event';
+
+export type PriceType = 'fixed' | 'on-request' | 'from';
+export type CtaAction = 'book' | 'whatsapp' | 'contact-form';
+export type PackageCategory = 'standard' | 'group' | 'corporate';
 
 export interface ServiceItem {
   id: string;
   slug: string;
   name: string;
+  subtitle?: string;
   tagline: string;
   category: ServiceType;
+  packageCategory: PackageCategory;
   durationMinutes: number;
-  basePrice: number;
+  priceType: PriceType;
+  basePrice?: number;
+  currency?: string;
   priceLabel: string;
   description: string;
-  includesAdults: number;
-  maxChildren: number;
+  includesAdults?: number;
+  maxChildren?: number;
   badge?: string;
   popular?: boolean;
   features: string[];
+  ctaText: string;
+  ctaAction: CtaAction;
+  isVisible: boolean;
 }
 
 export interface TimeSlot {

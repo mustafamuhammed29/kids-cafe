@@ -21,9 +21,15 @@
 
 /* Glassmorphism utilities */
 .glass-nav {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.glass-bottom-nav {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .glass-card {
@@ -38,10 +44,10 @@
   -webkit-backdrop-filter: blur(14px);
 }
 
-/* Patterns and custom imagery */
+/* Hero background with local asset and fallback */
 .hero-gradient {
   background: linear-gradient(135deg, rgba(24, 61, 61, 0.72) 0%, rgba(24, 61, 61, 0.82) 100%),
-              url('https://images.unsplash.com/photo-1519689680058-324335c77eba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80');
+              url('/assets/hero-bg.jpg');
   background-size: cover;
   background-position: center;
 }
@@ -53,16 +59,14 @@
   background-position: 0 0, 15px 15px;
 }
 
-/* Subtle smooth transitions */
-.animate-soft-bounce {
-  animation: softBounce 3s ease-in-out infinite;
+/* Safe area for iOS home indicator bar */
+.pb-safe {
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 16px));
 }
 
-@keyframes softBounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
+/* Mobile Spacing & Typography Optimization */
+@media (max-width: 640px) {
+  .hero-section {
+    min-height: 80vh !important;
   }
 }
