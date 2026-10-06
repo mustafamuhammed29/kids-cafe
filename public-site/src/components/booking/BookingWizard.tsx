@@ -16,6 +16,7 @@ import { SERVICES, DEFAULT_TIME_SLOTS, BUSINESS_INFO } from '../../data/mockData
 import type { ServiceItem, TimeSlot, BookingConfirmation, BookingFormData } from '../../types/booking';
 import { submitBooking } from '../../services/bookingService';
 import { MedicalDisclaimer } from '../common/MedicalDisclaimer';
+import { TurnstileWidget } from './TurnstileWidget';
 
 interface BookingWizardProps {
   isOpen: boolean;
@@ -56,6 +57,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const [specialRequests, setSpecialRequests] = useState('');
   const [acceptedRules, setAcceptedRules] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   // Confirmation state
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
@@ -131,7 +133,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         acceptedRules,
       };
 
-      const result = await submitBooking(formData, selectedService, selectedSlot);
+      const result = await submitBooking(formData, selectedService, selectedSlot, turnstileToken);
 
       if (!result.success) {
         setSubmitError(result.error || 'Reservierung fehlgeschlagen. Bitte versuche es erneut.');
@@ -666,6 +668,12 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   </span>
                 </label>
               </div>
+
+              {/* Anti-Abuse Spam Protection (Cloudflare Turnstile) */}
+              <TurnstileWidget
+                onVerify={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken(null)}
+              />
 
               {/* Payment notification */}
               <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2.5">

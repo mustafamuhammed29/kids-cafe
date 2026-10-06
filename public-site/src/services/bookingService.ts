@@ -140,7 +140,9 @@ export async function getAvailableTimeSlots(
 }
 
 /**
- * Submit a booking atomically through server-validated RPC
+ * Submit a booking atomically through Supabase Edge Function (create-booking)
+ * Architectural flow:
+ * Browser -> Edge Function (CORS + Turnstile + Rate Limit) -> create_booking_atomic -> Confirmation Email -> Safe Response
  * No raw personal data logged to console.
  * No client-controlled price vulnerability.
  * No direct table INSERT fallback.
@@ -148,7 +150,8 @@ export async function getAvailableTimeSlots(
 export async function submitBooking(
   formData: BookingFormData,
   service: ServiceItem,
-  slot: TimeSlot
+  slot: TimeSlot,
+  turnstileToken?: string | null
 ): Promise<BookingSubmissionResult> {
   const generatedRef = `HKC-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -160,17 +163,20 @@ export async function submitBooking(
   }
 
   try {
-    const { data, error } = await supabase.rpc('create_booking_atomic', {
-      p_customer_name: formData.parentName.trim(),
-      p_customer_email: formData.email.trim(),
-      p_customer_phone: formData.phone.trim(),
-      p_date: formData.date,
-      p_time_slot: `${slot.startTime} - ${slot.endTime}`,
-      p_service_id: service.slug || service.id,
-      p_num_children: formData.childrenCount,
-      p_num_adults: formData.adultsCount,
-      p_include_salt_room: formData.includeSaltRoomAddon,
-      p_notes: formData.specialRequests ? formData.specialRequests.trim() : undefined,
+    const { data, error } = await supabase.functions.invoke('create-booking', {
+      body: {
+        parentName: formData.parentName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        date: formData.date,
+        timeSlot: `${slot.startTime} - ${slot.endTime}`,
+        serviceSlug: service.slug || service.id,
+        childrenCount: formData.childrenCount,
+        adultsCount: formData.adultsCount,
+        includeSaltRoomAddon: formData.includeSaltRoomAddon,
+        specialRequests: formData.specialRequests ? formData.specialRequests.trim() : null,
+        turnstileToken: turnstileToken || null,
+      },
     });
 
     if (error) {
@@ -181,27 +187,23 @@ export async function submitBooking(
       };
     }
 
-    const rpcResult = data as unknown as {
+    const result = data as {
       success: boolean;
-      booking_id: string;
-      reference_code: string;
-      cancellation_token?: string;
-      error_message?: string;
+      reference_code?: string;
+      error?: string;
     };
 
-    if (!rpcResult.success) {
+    if (!result || !result.success) {
       return {
         success: false,
         referenceCode: '',
-        error: rpcResult.error_message || 'Dieser Zeitslot ist leider bereits ausgebucht.',
+        error: result?.error || 'Dieser Zeitslot ist leider bereits ausgebucht.',
       };
     }
 
     return {
       success: true,
-      referenceCode: rpcResult.reference_code,
-      cancellationToken: rpcResult.cancellation_token,
-      bookingId: rpcResult.booking_id,
+      referenceCode: result.reference_code || generatedRef,
     };
   } catch {
     return {
