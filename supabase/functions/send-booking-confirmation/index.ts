@@ -1,14 +1,24 @@
 // Supabase Edge Function: send-booking-confirmation
-// Automatically invoked via Database Webhook on public.bookings INSERT
+// Automatically invoked via Database Webhook or Secure API on public.bookings INSERT
 // Uses Resend API for GDPR-compliant EU transactional email delivery
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || '';
+const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET') || '';
+
+const ALLOWED_ORIGINS = [
+  'http://localhost:4173',
+  'http://localhost:4174',
+  'https://havenkids.de',
+  'https://www.havenkids.de',
+  'https://admin.havenkids.de',
+];
 
 interface BookingPayload {
   record: {
     reference_code: string;
+    cancellation_token?: string;
     customer_name: string;
     customer_email: string;
     customer_phone: string;
@@ -22,8 +32,35 @@ interface BookingPayload {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('Origin') || '';
+  const isAllowedOrigin = ALLOWED_ORIGINS.includes(origin);
+
+  const corsHeaders: Record<string, string> = {
+    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Security Check: If WEBHOOK_SECRET is set, verify authorization bearer
+  if (WEBHOOK_SECRET) {
+    const authHeader = req.headers.get('Authorization') || '';
+    if (!authHeader.includes(WEBHOOK_SECRET)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized webhook call' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   try {
@@ -33,9 +70,13 @@ serve(async (req) => {
     if (!b || !b.customer_email) {
       return new Response(JSON.stringify({ error: 'Missing booking record' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const cancelUrl = b.cancellation_token
+      ? `https://havenkids.de/stornierung?token=${b.cancellation_token}`
+      : 'https://havenkids.de/contact';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -54,6 +95,7 @@ serve(async (req) => {
     .label { color: #718096; }
     .value { font-weight: 600; color: #1A202C; text-align: right; }
     .footer { text-align: center; font-size: 12px; color: #A0AEC0; padding: 24px; background: #F7FAFC; }
+    .btn-cancel { display: inline-block; color: #718096; font-size: 12px; text-decoration: underline; margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -91,14 +133,14 @@ serve(async (req) => {
         </div>
         <div class="row">
           <span class="label">Gesamtbetrag:</span>
-          <span class="value">${b.total_price.toFixed(2)} € (Zahlung vor Ort)</span>
+          <span class="value">${Number(b.total_price).toFixed(2)} € (Zahlung vor Ort)</span>
         </div>
       </div>
 
       <div style="background: #FFFDF5; border: 1px solid #FEF08A; border-radius: 8px; padding: 16px; margin: 20px 0; font-size: 14px;">
         <strong>Wichtige Hinweise für deinen Besuch:</strong>
         <ul style="margin: 8px 0 0; padding-left: 20px; line-height: 1.5;">
-          <li>Bitte bringe rutschfeste Stoppersocken für die Kleinen mit.</li>
+          <li>Bitte bringe rutschfeste Stoppersocken für alle mit.</li>
           <li>Bitte erscheine ca. 10 Minuten vor Slot-Beginn.</li>
           <li>Kostenlose Stornierung bis 24 Stunden vor dem Termin möglich.</li>
         </ul>
@@ -108,6 +150,12 @@ serve(async (req) => {
         <strong>Adresse:</strong> Friedrichstraße 123, 10117 Berlin<br/>
         <strong>Fragen?</strong> Schreib uns auf WhatsApp oder antworte auf diese E-Mail.
       </p>
+
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="${cancelUrl}" class="btn-cancel">
+          Pläne geändert? Hier mit deinem persönlichen Stornierungs-Token stornieren
+        </a>
+      </div>
     </div>
     <div class="footer">
       © 2026 Haven Kids Café · Friedrichstraße 123, 10117 Berlin · hello@havenkids.de
@@ -134,13 +182,16 @@ serve(async (req) => {
     const resendData = await resendResponse.json();
 
     return new Response(JSON.stringify({ success: true, resendData }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   } catch (error: unknown) {
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Internal Server Error' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      }
+    );
   }
 });

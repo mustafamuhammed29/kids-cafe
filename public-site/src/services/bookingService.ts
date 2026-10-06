@@ -16,6 +16,7 @@ export interface SlotAvailability {
 export interface BookingSubmissionResult {
   success: boolean;
   referenceCode: string;
+  cancellationToken?: string;
   bookingId?: string;
   error?: string;
 }
@@ -36,7 +37,6 @@ export async function getBookingPackages(): Promise<ServiceItem[]> {
       .order('display_order', { ascending: true });
 
     if (error || !data || data.length === 0) {
-      console.warn('Falling back to local services due to query result:', error);
       return SERVICES;
     }
 
@@ -63,8 +63,7 @@ export async function getBookingPackages(): Promise<ServiceItem[]> {
         popular: existing?.popular,
       };
     });
-  } catch (err) {
-    console.error('Error fetching packages from Supabase:', err);
+  } catch {
     return SERVICES;
   }
 }
@@ -100,7 +99,7 @@ export async function getAvailableTimeSlots(
   try {
     const { data, error } = await supabase
       .from('time_slots')
-      .select('*')
+      .select('id, start_time, end_time, max_capacity, booked_count, is_active')
       .eq('date', date)
       .eq('service_id', serviceId)
       .eq('is_active', true);
@@ -126,8 +125,7 @@ export async function getAvailableTimeSlots(
         cleaningBuffer: slot.cleaningBuffer,
       };
     });
-  } catch (err) {
-    console.error('Error fetching time slots from Supabase:', err);
+  } catch {
     return DEFAULT_TIME_SLOTS.map((slot) => ({
       id: slot.id,
       startTime: slot.startTime,
@@ -142,18 +140,19 @@ export async function getAvailableTimeSlots(
 }
 
 /**
- * Submit a booking atomically
+ * Submit a booking atomically through server-validated RPC
+ * No raw personal data logged to console.
+ * No client-controlled price vulnerability.
+ * No direct table INSERT fallback.
  */
 export async function submitBooking(
   formData: BookingFormData,
   service: ServiceItem,
-  slot: TimeSlot,
-  totalPrice: number
+  slot: TimeSlot
 ): Promise<BookingSubmissionResult> {
   const generatedRef = `HKC-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   if (!isSupabaseConfigured) {
-    console.log('[Mock Mode] Reservation persisted locally:', { formData, service, slot, totalPrice, generatedRef });
     return {
       success: true,
       referenceCode: generatedRef,
@@ -161,77 +160,54 @@ export async function submitBooking(
   }
 
   try {
-    // Attempt atomic booking via stored RPC function
     const { data, error } = await supabase.rpc('create_booking_atomic', {
       p_customer_name: formData.parentName.trim(),
       p_customer_email: formData.email.trim(),
       p_customer_phone: formData.phone.trim(),
       p_date: formData.date,
       p_time_slot: `${slot.startTime} - ${slot.endTime}`,
-      p_service_id: service.id,
-      p_service_name: service.name,
+      p_service_id: service.slug || service.id,
       p_num_children: formData.childrenCount,
       p_num_adults: formData.adultsCount,
-      p_total_price: totalPrice,
-      p_notes: formData.specialRequests || undefined,
+      p_include_salt_room: formData.includeSaltRoomAddon,
+      p_notes: formData.specialRequests ? formData.specialRequests.trim() : undefined,
     });
 
     if (error) {
-      console.warn('RPC atomic function returned error, falling back to direct table insert:', error);
-      // Fallback: direct table insert
-      const { data: insertData, error: insertError } = await supabase
-        .from('bookings')
-        .insert({
-          reference_code: generatedRef,
-          customer_name: formData.parentName.trim(),
-          customer_email: formData.email.trim(),
-          customer_phone: formData.phone.trim(),
-          date: formData.date,
-          time_slot: `${slot.startTime} - ${slot.endTime}`,
-          service_id: service.id,
-          service_name: service.name,
-          num_children: formData.childrenCount,
-          num_adults: formData.adultsCount,
-          total_price: totalPrice,
-          status: 'confirmed',
-          payment_status: 'pending',
-          notes: formData.specialRequests || null,
-        })
-        .select('id, reference_code')
-        .single();
-
-      if (insertError) {
-        throw insertError;
-      }
-
       return {
-        success: true,
-        referenceCode: insertData.reference_code,
-        bookingId: insertData.id,
+        success: false,
+        referenceCode: '',
+        error: error.message || 'Die Reservierung konnte nicht verarbeitet werden. Bitte prüfe deine Angaben.',
       };
     }
 
-    const rpcResult = data as unknown as { success: boolean; booking_id: string; reference_code: string; error_message?: string };
+    const rpcResult = data as unknown as {
+      success: boolean;
+      booking_id: string;
+      reference_code: string;
+      cancellation_token?: string;
+      error_message?: string;
+    };
 
     if (!rpcResult.success) {
       return {
         success: false,
         referenceCode: '',
-        error: rpcResult.error_message || 'Buchung fehlgeschlagen. Slot möglicherweise voll.',
+        error: rpcResult.error_message || 'Dieser Zeitslot ist leider bereits ausgebucht.',
       };
     }
 
     return {
       success: true,
       referenceCode: rpcResult.reference_code,
+      cancellationToken: rpcResult.cancellation_token,
       bookingId: rpcResult.booking_id,
     };
-  } catch (err: unknown) {
-    console.error('Failed to submit booking:', err);
+  } catch {
     return {
       success: false,
       referenceCode: '',
-      error: err instanceof Error ? err.message : 'Unerwarteter Fehler bei der Reservierung.',
+      error: 'Unerwarteter Verbindungsfehler bei der Reservierung. Bitte versuche es erneut.',
     };
   }
 }

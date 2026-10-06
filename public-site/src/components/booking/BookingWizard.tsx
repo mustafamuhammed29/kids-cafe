@@ -131,7 +131,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         acceptedRules,
       };
 
-      const result = await submitBooking(formData, selectedService, selectedSlot, totalPrice);
+      const result = await submitBooking(formData, selectedService, selectedSlot);
 
       if (!result.success) {
         setSubmitError(result.error || 'Reservierung fehlgeschlagen. Bitte versuche es erneut.');

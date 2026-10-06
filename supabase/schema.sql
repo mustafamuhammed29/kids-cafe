@@ -6,12 +6,15 @@
 --    - SELECT active packages (is_visible = true)
 --    - SELECT active time slots (is_active = true)
 --    - Submit bookings via SECURITY DEFINER function `create_booking_atomic`
+--    - Cancel booking ONLY via secure secret token `cancel_booking_by_token`
 -- 2. Public has ZERO DIRECT ACCESS to:
---    - bookings table (SELECT, UPDATE, DELETE strictly disabled for public)
+--    - bookings table (SELECT, INSERT, UPDATE, DELETE strictly disabled for public)
 --    - staff_members table (cannot query staff records)
+--    - audit_logs table (cannot query internal logs)
 -- 3. Staff and Admins:
 --    - Verified through auth.users and public.staff_members
---    - Authorized via helper function `public.is_staff(auth.uid())`
+--    - Authorized via helper functions `public.is_staff()` & `public.is_admin_or_owner()`
+--    - Full audit logging of staff actions
 -- ==============================================================================
 
 -- 1. Enable required extensions
@@ -31,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.staff_members (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- Helper function: Is current user authorized staff?
+-- Helper function: Is current user authorized active staff?
 CREATE OR REPLACE FUNCTION public.is_staff(p_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -45,7 +48,7 @@ AS $$
     );
 $$;
 
--- Helper function: Is current user admin/owner?
+-- Helper function: Is current user authorized admin or owner?
 CREATE OR REPLACE FUNCTION public.is_admin_or_owner(p_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -105,6 +108,8 @@ CREATE INDEX IF NOT EXISTS idx_time_slots_date_service ON public.time_slots(date
 CREATE TABLE IF NOT EXISTS public.bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     reference_code VARCHAR(30) UNIQUE NOT NULL,
+    cancellation_token UUID NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+    token_expires_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('utc'::text, now()) + INTERVAL '30 days'),
     customer_name VARCHAR(150) NOT NULL,
     customer_email VARCHAR(150) NOT NULL,
     customer_phone VARCHAR(50) NOT NULL,
@@ -112,9 +117,9 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     time_slot VARCHAR(30) NOT NULL, -- e.g. "10:00 - 12:00"
     service_id VARCHAR(50) NOT NULL,
     service_name VARCHAR(100) NOT NULL,
-    num_children INT NOT NULL CHECK (num_children > 0),
-    num_adults INT NOT NULL CHECK (num_adults >= 0),
-    total_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    num_children INT NOT NULL CHECK (num_children > 0 AND num_children <= 20),
+    num_adults INT NOT NULL CHECK (num_adults >= 0 AND num_adults <= 10),
+    total_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00 CHECK (total_price >= 0),
     status VARCHAR(30) NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
     payment_status VARCHAR(30) NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid_on_arrival', 'refunded')),
     notes TEXT,
@@ -125,9 +130,26 @@ CREATE TABLE IF NOT EXISTS public.bookings (
 CREATE INDEX IF NOT EXISTS idx_bookings_date ON public.bookings(date);
 CREATE INDEX IF NOT EXISTS idx_bookings_email ON public.bookings(customer_email);
 CREATE INDEX IF NOT EXISTS idx_bookings_reference ON public.bookings(reference_code);
+CREATE INDEX IF NOT EXISTS idx_bookings_token ON public.bookings(cancellation_token);
 
 -- ==============================================================================
--- 6. ATOMIC CONCURRENCY FUNCTION (Safe Public Submission Endpoint)
+-- 6. AUDIT LOGS TABLE (Restricted to Authorized Staff)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    action VARCHAR(50) NOT NULL, -- e.g. 'BOOKING_UPDATE', 'STATUS_CHANGE', 'SLOT_BLOCK'
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id VARCHAR(100),
+    details JSONB,
+    ip_address INET,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON public.audit_logs(action, created_at);
+
+-- ==============================================================================
+-- 7. ATOMIC CONCURRENCY FUNCTION WITH SERVER-SIDE PRICE VALIDATION & RATE LIMITING
 -- ==============================================================================
 CREATE OR REPLACE FUNCTION public.create_booking_atomic(
     p_customer_name VARCHAR,
@@ -136,10 +158,9 @@ CREATE OR REPLACE FUNCTION public.create_booking_atomic(
     p_date DATE,
     p_time_slot VARCHAR,
     p_service_id VARCHAR,
-    p_service_name VARCHAR,
     p_num_children INT,
     p_num_adults INT,
-    p_total_price NUMERIC,
+    p_include_salt_room BOOLEAN DEFAULT false,
     p_notes TEXT DEFAULT NULL
 )
 RETURNS JSONB
@@ -148,15 +169,94 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_slot_record RECORD;
+    v_package_record RECORD;
     v_max_cap INT;
     v_ref_code VARCHAR(30);
+    v_cancellation_token UUID;
     v_booking_id UUID;
     v_start_time VARCHAR(10);
+    v_calculated_price NUMERIC(10, 2);
+    v_clean_name VARCHAR(150);
+    v_clean_email VARCHAR(150);
+    v_clean_phone VARCHAR(50);
 BEGIN
-    -- Extract start time from string "10:00 - 12:00"
+    -- 1. Anti-Spam / Rate Limiting Guard: Max 1 booking per email within 60 seconds
+    IF EXISTS (
+        SELECT 1
+        FROM public.bookings
+        WHERE lower(customer_email) = lower(trim(p_customer_email))
+          AND created_at > (timezone('utc'::text, now()) - INTERVAL '60 seconds')
+    ) THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error_message', 'Bitte warte einen kurzen Moment vor einer weiteren Buchung (Spamschutz).'
+        );
+    END IF;
+
+    -- 2. Input Sanity Checks
+    v_clean_name := trim(p_customer_name);
+    v_clean_email := lower(trim(p_customer_email));
+    v_clean_phone := trim(p_customer_phone);
+
+    IF length(v_clean_name) < 2 THEN
+        RETURN jsonb_build_object('success', false, 'error_message', 'Bitte gib einen gültigen Namen an.');
+    END IF;
+
+    IF v_clean_email NOT LIKE '%@%.%' OR length(v_clean_email) < 5 THEN
+        RETURN jsonb_build_object('success', false, 'error_message', 'Bitte gib eine gültige E-Mail-Adresse an.');
+    END IF;
+
+    IF length(v_clean_phone) < 6 THEN
+        RETURN jsonb_build_object('success', false, 'error_message', 'Bitte gib eine gültige Telefonnummer an.');
+    END IF;
+
+    IF p_date < CURRENT_DATE THEN
+        RETURN jsonb_build_object('success', false, 'error_message', 'Buchungen in der Vergangenheit sind nicht möglich.');
+    END IF;
+
+    IF p_num_children < 1 OR p_num_children > 20 THEN
+        RETURN jsonb_build_object('success', false, 'error_message', 'Ungültige Anzahl an Kindern (1-20).');
+    END IF;
+
+    -- 3. Validate Service and Calculate Price Server-Side (Tamper-Proof)
+    SELECT *
+    INTO v_package_record
+    FROM public.packages
+    WHERE (slug = p_service_id OR id::text = p_service_id)
+      AND is_visible = true
+    LIMIT 1;
+
+    IF v_package_record.id IS NULL THEN
+        -- Fallback check for single visit default if slug was 'service-single'
+        SELECT *
+        INTO v_package_record
+        FROM public.packages
+        WHERE slug IN ('einzelbesuch', '10er-block', 'kindergeburtstag')
+        ORDER BY display_order ASC
+        LIMIT 1;
+    END IF;
+
+    -- Compute canonical price server-side from database base_price
+    IF v_package_record.slug = 'einzelbesuch' OR v_package_record.price_type = 'fixed' AND v_package_record.slug NOT IN ('10er-block', 'kindergeburtstag') THEN
+        v_calculated_price := (COALESCE(v_package_record.base_price, 14.00) * p_num_children);
+        IF p_include_salt_room = true THEN
+            v_calculated_price := v_calculated_price + (5.00 * p_num_children);
+        END IF;
+    ELSIF v_package_record.slug = '10er-block' THEN
+        v_calculated_price := COALESCE(v_package_record.base_price, 120.00);
+    ELSIF v_package_record.slug = 'kindergeburtstag' THEN
+        v_calculated_price := COALESCE(v_package_record.base_price, 250.00);
+        IF p_include_salt_room = true THEN
+            v_calculated_price := v_calculated_price + (5.00 * p_num_children);
+        END IF;
+    ELSE
+        -- On-request packages require manual confirmation (0.00 upfront)
+        v_calculated_price := 0.00;
+    END IF;
+
+    -- 4. Capacity & Concurrency Management
     v_start_time := trim(split_part(p_time_slot, '-', 1));
 
-    -- Determine max capacity according to business rules
     IF p_service_id = 'salt-room' OR p_service_id LIKE '%salt%' THEN
         v_max_cap := 8;
     ELSE
@@ -175,7 +275,7 @@ BEGIN
     WHERE date = p_date AND start_time = v_start_time AND service_id = p_service_id
     FOR UPDATE;
 
-    -- Check if slot has enough remaining capacity
+    -- Check remaining capacity
     IF (v_slot_record.booked_count + p_num_children) > v_slot_record.max_capacity THEN
         RETURN jsonb_build_object(
             'success', false,
@@ -183,17 +283,19 @@ BEGIN
         );
     END IF;
 
-    -- Increment slot booked count
+    -- Increment slot count
     UPDATE public.time_slots
     SET booked_count = booked_count + p_num_children
     WHERE id = v_slot_record.id;
 
-    -- Generate reference code: HKC-YYYYMMDD-XXXX
-    v_ref_code := 'HKC-' || to_char(p_date, 'YYYYMMDD') || '-' || upper(substring(md5(random()::text) from 1 for 4));
+    -- 5. Safe Reference Code & Secret Token Generation
+    v_ref_code := 'HKC-' || to_char(p_date, 'YYYYMMDD') || '-' || upper(substring(encode(gen_random_bytes(4), 'hex') from 1 for 4));
+    v_cancellation_token := gen_random_uuid();
 
-    -- Insert confirmed booking
+    -- 6. Insert confirmed booking with server-calculated price
     INSERT INTO public.bookings (
         reference_code,
+        cancellation_token,
         customer_name,
         customer_email,
         customer_phone,
@@ -209,16 +311,17 @@ BEGIN
         notes
     ) VALUES (
         v_ref_code,
-        p_customer_name,
-        p_customer_email,
-        p_customer_phone,
+        v_cancellation_token,
+        v_clean_name,
+        v_clean_email,
+        v_clean_phone,
         p_date,
         p_time_slot,
-        p_service_id,
-        p_service_name,
+        v_package_record.slug,
+        v_package_record.name,
         p_num_children,
         p_num_adults,
-        p_total_price,
+        v_calculated_price,
         'confirmed',
         'pending',
         p_notes
@@ -228,7 +331,9 @@ BEGIN
     RETURN jsonb_build_object(
         'success', true,
         'booking_id', v_booking_id,
-        'reference_code', v_ref_code
+        'reference_code', v_ref_code,
+        'cancellation_token', v_cancellation_token,
+        'total_price', v_calculated_price
     );
 END;
 $$;
@@ -237,23 +342,78 @@ $$;
 GRANT EXECUTE ON FUNCTION public.create_booking_atomic TO anon, authenticated;
 
 -- ==============================================================================
--- 7. HARDENED ROW LEVEL SECURITY (RLS) POLICIES
+-- 8. SECURE TOKEN-BASED CANCELLATION FUNCTION (Customer Self-Service)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.cancel_booking_by_token(
+    p_cancellation_token UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_booking RECORD;
+    v_start_time VARCHAR(10);
+BEGIN
+    -- Query booking by secret UUID token (NOT guessable reference code)
+    SELECT *
+    INTO v_booking
+    FROM public.bookings
+    WHERE cancellation_token = p_cancellation_token
+      AND status != 'cancelled'
+      AND token_expires_at > timezone('utc'::text, now())
+    FOR UPDATE;
+
+    IF v_booking.id IS NULL THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error_message', 'Ungültiger oder abgelaufener Stornierungs-Token.'
+        );
+    END IF;
+
+    -- Update booking status
+    UPDATE public.bookings
+    SET status = 'cancelled', updated_at = timezone('utc'::text, now())
+    WHERE id = v_booking.id;
+
+    -- Restore slot capacity
+    v_start_time := trim(split_part(v_booking.time_slot, '-', 1));
+
+    UPDATE public.time_slots
+    SET booked_count = GREATEST(0, booked_count - v_booking.num_children)
+    WHERE date = v_booking.date
+      AND start_time = v_start_time
+      AND service_id = v_booking.service_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'reference_code', v_booking.reference_code,
+        'message', 'Deine Reservierung wurde erfolgreich storniert.'
+    );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.cancel_booking_by_token TO anon, authenticated;
+
+-- ==============================================================================
+-- 9. HARDENED ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
 ALTER TABLE public.staff_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.packages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.time_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- ------------------------------------------------------------------------------
 -- A. Staff Members Policies
 -- ------------------------------------------------------------------------------
--- Staff can view other active staff profiles
+-- Staff can view staff profiles
 CREATE POLICY "Staff can view staff profiles"
     ON public.staff_members FOR SELECT
     TO authenticated
     USING (public.is_staff(auth.uid()));
 
--- Only owners/admins can insert or update staff members
+-- Only owners/admins can insert, update, or delete staff members
 CREATE POLICY "Admins can manage staff members"
     ON public.staff_members FOR ALL
     TO authenticated
@@ -268,30 +428,30 @@ CREATE POLICY "Public can view active packages"
     ON public.packages FOR SELECT
     USING (is_visible = true);
 
--- Only verified staff can modify packages
-CREATE POLICY "Staff can manage packages"
+-- Only owners/admins can modify pricing, packages, and rules
+CREATE POLICY "Admins can manage packages"
     ON public.packages FOR ALL
     TO authenticated
-    USING (public.is_staff(auth.uid()))
-    WITH CHECK (public.is_staff(auth.uid()));
+    USING (public.is_admin_or_owner(auth.uid()))
+    WITH CHECK (public.is_admin_or_owner(auth.uid()));
 
 -- ------------------------------------------------------------------------------
 -- C. Time Slots Policies
 -- ------------------------------------------------------------------------------
--- Public can view active time slots (safe capacity check)
+-- Public can view active time slots (safe capacity check only)
 CREATE POLICY "Public can view active time slots"
     ON public.time_slots FOR SELECT
     USING (is_active = true);
 
--- Only verified staff can modify time slots
-CREATE POLICY "Staff can manage time slots"
+-- Only owners/admins can manage capacity, slots, and blocked dates
+CREATE POLICY "Admins can manage time slots"
     ON public.time_slots FOR ALL
     TO authenticated
-    USING (public.is_staff(auth.uid()))
-    WITH CHECK (public.is_staff(auth.uid()));
+    USING (public.is_admin_or_owner(auth.uid()))
+    WITH CHECK (public.is_admin_or_owner(auth.uid()));
 
 -- ------------------------------------------------------------------------------
--- D. Bookings Policies (PRIVATE — NO PUBLIC READ/WRITE ACCESS)
+-- D. Bookings Policies (PRIVATE — NO PUBLIC DIRECT ACCESS)
 -- ------------------------------------------------------------------------------
 -- Strictly NO public SELECT! Only authenticated staff can read bookings
 CREATE POLICY "Staff can view bookings"
@@ -306,27 +466,40 @@ CREATE POLICY "Staff can update bookings"
     USING (public.is_staff(auth.uid()))
     WITH CHECK (public.is_staff(auth.uid()));
 
--- Only authenticated admins can delete bookings
+-- Only owners/admins can delete bookings
 CREATE POLICY "Admins can delete bookings"
     ON public.bookings FOR DELETE
     TO authenticated
     USING (public.is_admin_or_owner(auth.uid()));
 
 -- Direct INSERT on bookings by public is BLOCKED
--- All public bookings must go through create_booking_atomic()
+-- All public bookings MUST go through create_booking_atomic()
 CREATE POLICY "Staff can insert bookings directly"
     ON public.bookings FOR INSERT
     TO authenticated
     WITH CHECK (public.is_staff(auth.uid()));
 
+-- ------------------------------------------------------------------------------
+-- E. Audit Logs Policies (INTERNAL ONLY — ZERO PUBLIC ACCESS)
+-- ------------------------------------------------------------------------------
+CREATE POLICY "Staff can view audit logs"
+    ON public.audit_logs FOR SELECT
+    TO authenticated
+    USING (public.is_staff(auth.uid()));
+
+CREATE POLICY "Staff can write audit logs"
+    ON public.audit_logs FOR INSERT
+    TO authenticated
+    WITH CHECK (public.is_staff(auth.uid()));
+
 -- ==============================================================================
--- 8. REALTIME SUBSCRIPTION REGISTRATION
+-- 10. REALTIME SUBSCRIPTION REGISTRATION
 -- ==============================================================================
 ALTER PUBLICATION supabase_realtime ADD TABLE public.time_slots;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
 
 -- ==============================================================================
--- 9. INITIAL SEED DATA (All 6 Packages)
+-- 11. INITIAL SEED DATA (All 6 Packages)
 -- ==============================================================================
 INSERT INTO public.packages (slug, name, subtitle, description, features, price_type, base_price, currency, cta_text, cta_action, is_visible, category, display_order)
 VALUES

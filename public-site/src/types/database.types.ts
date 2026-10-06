@@ -9,6 +9,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      staff_members: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          role: 'owner' | 'admin' | 'staff';
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name?: string | null;
+          role?: 'owner' | 'admin' | 'staff';
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          full_name?: string | null;
+          role?: 'owner' | 'admin' | 'staff';
+          is_active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       packages: {
         Row: {
           id: string;
@@ -104,6 +133,8 @@ export type Database = {
         Row: {
           id: string;
           reference_code: string;
+          cancellation_token: string;
+          token_expires_at: string;
           customer_name: string;
           customer_email: string;
           customer_phone: string;
@@ -122,7 +153,9 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          reference_code: string;
+          reference_code?: string;
+          cancellation_token?: string;
+          token_expires_at?: string;
           customer_name: string;
           customer_email: string;
           customer_phone: string;
@@ -132,7 +165,7 @@ export type Database = {
           service_name: string;
           num_children: number;
           num_adults: number;
-          total_price: number;
+          total_price?: number;
           status?: 'pending' | 'confirmed' | 'cancelled' | 'completed';
           payment_status?: 'pending' | 'paid_on_arrival' | 'refunded';
           notes?: string | null;
@@ -142,6 +175,8 @@ export type Database = {
         Update: {
           id?: string;
           reference_code?: string;
+          cancellation_token?: string;
+          token_expires_at?: string;
           customer_name?: string;
           customer_email?: string;
           customer_phone?: string;
@@ -159,6 +194,38 @@ export type Database = {
         };
         Relationships: [];
       };
+      audit_logs: {
+        Row: {
+          id: string;
+          staff_id: string | null;
+          action: string;
+          resource_type: string;
+          resource_id: string | null;
+          details: Json;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          staff_id?: string | null;
+          action: string;
+          resource_type: string;
+          resource_id?: string | null;
+          details?: Json;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          staff_id?: string | null;
+          action?: string;
+          resource_type?: string;
+          resource_id?: string | null;
+          details?: Json;
+          ip_address?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -172,11 +239,16 @@ export type Database = {
           p_date: string;
           p_time_slot: string;
           p_service_id: string;
-          p_service_name: string;
           p_num_children: number;
           p_num_adults: number;
-          p_total_price: number;
+          p_include_salt_room?: boolean;
           p_notes?: string;
+        };
+        Returns: Json;
+      };
+      cancel_booking_by_token: {
+        Args: {
+          p_cancellation_token: string;
         };
         Returns: Json;
       };
