@@ -10,9 +10,11 @@ import {
   Wind,
   Download,
   MessageCircle,
+  Loader2,
 } from 'lucide-react';
 import { SERVICES, DEFAULT_TIME_SLOTS, BUSINESS_INFO } from '../../data/mockData';
-import type { ServiceItem, TimeSlot, BookingConfirmation } from '../../types/booking';
+import type { ServiceItem, TimeSlot, BookingConfirmation, BookingFormData } from '../../types/booking';
+import { submitBooking } from '../../services/bookingService';
 import { MedicalDisclaimer } from '../common/MedicalDisclaimer';
 
 interface BookingWizardProps {
@@ -102,34 +104,67 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     setChildrenAges(newAges);
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   // Submit & finalize booking
-  const handleFinalizeBooking = (e: React.FormEvent) => {
+  const handleFinalizeBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!acceptedRules) return;
+    if (!acceptedRules || isSubmitting) return;
 
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const refCode = `HVN-2026-${randomSuffix}`;
+    setIsSubmitting(true);
+    setSubmitError(null);
 
-    const newConfirmation: BookingConfirmation = {
-      reference: refCode,
-      service: selectedService,
-      date: selectedDate,
-      timeSlot: selectedSlot,
-      childrenCount,
-      adultsCount,
-      childrenAges,
-      includeSaltRoomAddon: includeSaltRoom,
-      parentName,
-      email,
-      phone,
-      specialRequests,
-      totalPrice,
-      paymentMethod: 'pay_on_arrival',
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      const formData: BookingFormData = {
+        serviceId: selectedService.id,
+        date: selectedDate,
+        timeSlotId: selectedSlot.id,
+        childrenCount,
+        adultsCount,
+        childrenAges,
+        includeSaltRoomAddon: includeSaltRoom,
+        parentName,
+        email,
+        phone,
+        specialRequests,
+        marketingConsent,
+        acceptedRules,
+      };
 
-    setConfirmation(newConfirmation);
-    setStep(5);
+      const result = await submitBooking(formData, selectedService, selectedSlot, totalPrice);
+
+      if (!result.success) {
+        setSubmitError(result.error || 'Reservierung fehlgeschlagen. Bitte versuche es erneut.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const newConfirmation: BookingConfirmation = {
+        reference: result.referenceCode,
+        service: selectedService,
+        date: selectedDate,
+        timeSlot: selectedSlot,
+        childrenCount,
+        adultsCount,
+        childrenAges,
+        includeSaltRoomAddon: includeSaltRoom,
+        parentName,
+        email,
+        phone,
+        specialRequests,
+        totalPrice,
+        paymentMethod: 'pay_on_arrival',
+        createdAt: new Date().toISOString(),
+      };
+
+      setConfirmation(newConfirmation);
+      setStep(5);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : 'Unerwarteter Fehler bei der Reservierung.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Download .ics calendar event
@@ -641,22 +676,39 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 </span>
               </div>
 
+              {submitError && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                  <X className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
               <div className="pt-2 flex justify-between items-center">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setStep(3)}
-                  className="text-gray-600 hover:text-black font-semibold text-xs flex items-center gap-1 cursor-pointer min-h-[44px] min-w-[44px]"
+                  className="text-gray-600 hover:text-black font-semibold text-xs flex items-center gap-1 cursor-pointer min-h-[44px] min-w-[44px] disabled:opacity-50"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Zurück</span>
                 </button>
                 <button
                   type="submit"
-                  disabled={!acceptedRules}
+                  disabled={!acceptedRules || isSubmitting}
                   className="bg-[#5C8374] hover:bg-[#183D3D] disabled:opacity-50 text-white px-8 py-3.5 rounded-full font-extrabold text-sm transition shadow-lg flex items-center gap-2 cursor-pointer min-h-[44px]"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Verbindlich reservieren</span>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Wird reserviert...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Verbindlich reservieren</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
