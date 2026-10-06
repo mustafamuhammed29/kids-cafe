@@ -1,32 +1,67 @@
-# React + TypeScript + Vite
+# Haven Kids Café — Architecture & Security Blueprint
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Enterprise-grade booking platform and management system for **Haven Kids Café** in Berlin.
 
-Currently, two official plugins are available:
+## Architectural Separation & Security Model
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The system is strictly divided into two autonomous applications to guarantee customer privacy and server-side authorization:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```text
+Kids/
+├── public-site/                 # Customer-Facing Web App (https://havenkids.de)
+│   ├── src/                     # Customer routes: /, /services, /pricing, /gallery, /faq, /contact
+│   ├── public/                  # Assets, brand logo, favicon, photos (<180KB)
+│   ├── package.json
+│   ├── vite.config.ts           # Configured for Port 5173 (Dev) & 4173 (Preview)
+│   └── .env.example
+│
+├── admin-dashboard/             # Staff & Admin Workspace (https://admin.havenkids.de)
+│   ├── src/                     # Supabase Auth, protected dashboard, bookings management
+│   ├── public/                  # Favicon
+│   ├── package.json
+│   ├── vite.config.ts           # Configured for Port 5174 (Dev) & 4174 (Preview)
+│   └── .env.example
+│
+├── supabase/                    # Backend Infrastructure & Security
+│   ├── schema.sql               # Hardened PostgreSQL schema, staff_members table, RLS, atomic RPC
+│   └── functions/               # Supabase Edge Functions (Resend email confirmation)
+│
+└── haven_kids_cafe_website.html # Design concept reference
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+---
+
+## Security Invariants
+
+1. **Zero Admin Footprint on Public Site:**
+   - No "Admin Login", "Für Personal", or lock icons exist on the customer website.
+   - No `/admin-login` or `/admin/dashboard` routes exist in the public bundle.
+   - Zero hardcoded admin credentials or `localStorage` auth flags.
+
+2. **Real Supabase Auth & Role-Based Authorization:**
+   - Admin authentication is handled strictly via Supabase Auth (`supabase.auth.signInWithPassword`).
+   - Staff membership and permissions are validated database-side via `public.staff_members` and `public.is_staff(auth.uid())`.
+   - Anonymous/unauthenticated requests cannot access the admin portal.
+
+3. **Hardened Row-Level Security (RLS):**
+   - Direct SELECT, UPDATE, or DELETE on `bookings` is restricted strictly to active staff members.
+   - Public customer bookings are created solely through the stored procedure `public.create_booking_atomic()` (`SECURITY DEFINER`), guaranteeing mathematical atomicity and zero race-condition overbooking.
+
+---
+
+## Local Development & Ports
+
+| Application | Production Target | Local Dev Port | Local Preview Port |
+|---|---|---|---|
+| **Public Customer Site** | `https://havenkids.de/` | `http://localhost:5173/` | `http://localhost:4173/` |
+| **Admin Staff Portal** | `https://admin.havenkids.de/` | `http://localhost:5174/` | `http://localhost:4174/` |
+
+### Available Root Commands
+
+- `npm run build` — Builds both applications.
+- `npm run build:public` — Builds only the public customer website.
+- `npm run build:admin` — Builds only the admin staff dashboard.
+- `npm run dev:public` — Launches the customer site dev server.
+- `npm run dev:admin` — Launches the admin dashboard dev server.
+- `npm run preview:public` — Serves production build of customer site on `http://localhost:4173/`.
+- `npm run preview:admin` — Serves production build of admin portal on `http://localhost:4174/`.

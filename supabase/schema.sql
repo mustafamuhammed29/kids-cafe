@@ -1,20 +1,66 @@
 -- ==============================================================================
--- HAVEN KIDS CAFÉ — PRODUCTION POSTGRESQL SCHEMA (SUPABASE FRANKFURT EU-CENTRAL-1)
+-- HAVEN KIDS CAFÉ — HARDENED POSTGRESQL SCHEMA (SUPABASE FRANKFURT EU-CENTRAL-1)
 -- ==============================================================================
--- Run this script in your Supabase SQL Editor (Dashboard -> SQL Editor -> New Query)
+-- Security Architecture:
+-- 1. Public customer app can ONLY:
+--    - SELECT active packages (is_visible = true)
+--    - SELECT active time slots (is_active = true)
+--    - Submit bookings via SECURITY DEFINER function `create_booking_atomic`
+-- 2. Public has ZERO DIRECT ACCESS to:
+--    - bookings table (SELECT, UPDATE, DELETE strictly disabled for public)
+--    - staff_members table (cannot query staff records)
+-- 3. Staff and Admins:
+--    - Verified through auth.users and public.staff_members
+--    - Authorized via helper function `public.is_staff(auth.uid())`
 -- ==============================================================================
 
 -- 1. Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 2. Drop existing tables if re-running (safe initialization)
--- DROP TABLE IF EXISTS public.bookings CASCADE;
--- DROP TABLE IF EXISTS public.time_slots CASCADE;
--- DROP TABLE IF EXISTS public.packages CASCADE;
+-- ==============================================================================
+-- 2. STAFF MEMBERS & AUTHORIZATION TABLE
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.staff_members (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    full_name VARCHAR(100),
+    role VARCHAR(30) NOT NULL DEFAULT 'staff' CHECK (role IN ('owner', 'admin', 'staff')),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- Helper function: Is current user authorized staff?
+CREATE OR REPLACE FUNCTION public.is_staff(p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.staff_members
+        WHERE id = p_user_id AND is_active = true
+    );
+$$;
+
+-- Helper function: Is current user admin/owner?
+CREATE OR REPLACE FUNCTION public.is_admin_or_owner(p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.staff_members
+        WHERE id = p_user_id AND is_active = true AND role IN ('owner', 'admin')
+    );
+$$;
 
 -- ==============================================================================
--- 3. PACKAGES TABLE (Phase 1 & Phase 3 Admin Editable)
+-- 3. PACKAGES TABLE (Public Catalog)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.packages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -36,7 +82,7 @@ CREATE TABLE IF NOT EXISTS public.packages (
 );
 
 -- ==============================================================================
--- 4. TIME SLOTS TABLE (Capacity & Concurrency Management)
+-- 4. TIME SLOTS TABLE (Capacity & Availability)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.time_slots (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -54,7 +100,7 @@ CREATE TABLE IF NOT EXISTS public.time_slots (
 CREATE INDEX IF NOT EXISTS idx_time_slots_date_service ON public.time_slots(date, service_id);
 
 -- ==============================================================================
--- 5. BOOKINGS TABLE (Customer Reservations)
+-- 5. BOOKINGS TABLE (Customer Reservations — Private)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -81,7 +127,7 @@ CREATE INDEX IF NOT EXISTS idx_bookings_email ON public.bookings(customer_email)
 CREATE INDEX IF NOT EXISTS idx_bookings_reference ON public.bookings(reference_code);
 
 -- ==============================================================================
--- 6. ATOMIC CONCURRENCY FUNCTION (Zero Overbooking)
+-- 6. ATOMIC CONCURRENCY FUNCTION (Safe Public Submission Endpoint)
 -- ==============================================================================
 CREATE OR REPLACE FUNCTION public.create_booking_atomic(
     p_customer_name VARCHAR,
@@ -111,18 +157,18 @@ BEGIN
     v_start_time := trim(split_part(p_time_slot, '-', 1));
 
     -- Determine max capacity according to business rules
-    IF p_service_id = 'salt-room' THEN
+    IF p_service_id = 'salt-room' OR p_service_id LIKE '%salt%' THEN
         v_max_cap := 8;
     ELSE
         v_max_cap := 20;
     END IF;
 
-    -- Ensure slot record exists with row-level lock (FOR UPDATE)
+    -- Ensure slot record exists
     INSERT INTO public.time_slots (date, start_time, end_time, service_id, max_capacity, booked_count)
     VALUES (p_date, v_start_time, trim(split_part(p_time_slot, '-', 2)), p_service_id, v_max_cap, 0)
     ON CONFLICT (date, start_time, service_id) DO NOTHING;
 
-    -- Lock the specific slot row to serialize concurrent reservations
+    -- Lock the specific slot row to serialize concurrent reservations (prevent race conditions)
     SELECT id, booked_count, max_capacity
     INTO v_slot_record
     FROM public.time_slots
@@ -137,7 +183,7 @@ BEGIN
         );
     END IF;
 
-    -- Update slot booked count
+    -- Increment slot booked count
     UPDATE public.time_slots
     SET booked_count = booked_count + p_num_children
     WHERE id = v_slot_record.id;
@@ -187,45 +233,91 @@ BEGIN
 END;
 $$;
 
+-- Allow public (anon) and authenticated to execute the atomic booking function
+GRANT EXECUTE ON FUNCTION public.create_booking_atomic TO anon, authenticated;
+
 -- ==============================================================================
--- 7. ROW LEVEL SECURITY (RLS) POLICIES
+-- 7. HARDENED ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
+ALTER TABLE public.staff_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.packages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.time_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 
--- Packages policies
+-- ------------------------------------------------------------------------------
+-- A. Staff Members Policies
+-- ------------------------------------------------------------------------------
+-- Staff can view other active staff profiles
+CREATE POLICY "Staff can view staff profiles"
+    ON public.staff_members FOR SELECT
+    TO authenticated
+    USING (public.is_staff(auth.uid()));
+
+-- Only owners/admins can insert or update staff members
+CREATE POLICY "Admins can manage staff members"
+    ON public.staff_members FOR ALL
+    TO authenticated
+    USING (public.is_admin_or_owner(auth.uid()))
+    WITH CHECK (public.is_admin_or_owner(auth.uid()));
+
+-- ------------------------------------------------------------------------------
+-- B. Packages Policies
+-- ------------------------------------------------------------------------------
+-- Public can ONLY read visible packages
 CREATE POLICY "Public can view active packages"
     ON public.packages FOR SELECT
     USING (is_visible = true);
 
-CREATE POLICY "Admins full access on packages"
+-- Only verified staff can modify packages
+CREATE POLICY "Staff can manage packages"
     ON public.packages FOR ALL
     TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    USING (public.is_staff(auth.uid()))
+    WITH CHECK (public.is_staff(auth.uid()));
 
--- Time slots policies
-CREATE POLICY "Public can view time slots"
+-- ------------------------------------------------------------------------------
+-- C. Time Slots Policies
+-- ------------------------------------------------------------------------------
+-- Public can view active time slots (safe capacity check)
+CREATE POLICY "Public can view active time slots"
     ON public.time_slots FOR SELECT
     USING (is_active = true);
 
-CREATE POLICY "Admins full access on time slots"
+-- Only verified staff can modify time slots
+CREATE POLICY "Staff can manage time slots"
     ON public.time_slots FOR ALL
     TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    USING (public.is_staff(auth.uid()))
+    WITH CHECK (public.is_staff(auth.uid()));
 
--- Bookings policies
-CREATE POLICY "Public can view own booking via reference"
+-- ------------------------------------------------------------------------------
+-- D. Bookings Policies (PRIVATE — NO PUBLIC READ/WRITE ACCESS)
+-- ------------------------------------------------------------------------------
+-- Strictly NO public SELECT! Only authenticated staff can read bookings
+CREATE POLICY "Staff can view bookings"
     ON public.bookings FOR SELECT
-    USING (true);
-
-CREATE POLICY "Admins full access on bookings"
-    ON public.bookings FOR ALL
     TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    USING (public.is_staff(auth.uid()));
+
+-- Only authenticated staff can update bookings (e.g. status changes, notes)
+CREATE POLICY "Staff can update bookings"
+    ON public.bookings FOR UPDATE
+    TO authenticated
+    USING (public.is_staff(auth.uid()))
+    WITH CHECK (public.is_staff(auth.uid()));
+
+-- Only authenticated admins can delete bookings
+CREATE POLICY "Admins can delete bookings"
+    ON public.bookings FOR DELETE
+    TO authenticated
+    USING (public.is_admin_or_owner(auth.uid()));
+
+-- Direct INSERT on bookings by public is BLOCKED
+-- All public bookings must go through create_booking_atomic()
+CREATE POLICY "Staff can insert bookings directly"
+    ON public.bookings FOR INSERT
+    TO authenticated
+    WITH CHECK (public.is_staff(auth.uid()));
 
 -- ==============================================================================
 -- 8. REALTIME SUBSCRIPTION REGISTRATION

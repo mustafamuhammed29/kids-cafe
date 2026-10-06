@@ -59,6 +59,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
   // Confirmation state
   const [confirmation, setConfirmation] = useState<BookingConfirmation | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Helper ID for accessibility
   const titleId = useId();
@@ -103,9 +105,6 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     newAges[index] = Math.max(0, Math.min(8, age));
     setChildrenAges(newAges);
   };
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Submit & finalize booking
   const handleFinalizeBooking = async (e: React.FormEvent) => {

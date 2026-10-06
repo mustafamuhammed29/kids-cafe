@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, Heart, Lock } from 'lucide-react';
+import { MessageCircle, Heart, MapPin } from 'lucide-react';
 import { BUSINESS_INFO } from '../../data/mockData';
 
 interface FooterProps {
@@ -95,27 +95,22 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLegal, onOpenBooking }) =>
             </p>
           </div>
 
-          {/* Staff Login (Subtle) */}
+          {/* Standort & Kontakt */}
           <div>
-            <h3 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Für Mitarbeiter</h3>
-            <ul className="space-y-2 text-xs text-gray-400">
-              <li>
-                <Link
-                  to="/admin-login"
-                  className="inline-flex items-center gap-1.5 text-gray-400 hover:text-[#93B1A6] transition-colors"
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>Admin Login</span>
-                </Link>
-              </li>
-            </ul>
-
-            <div className="mt-6 pt-4 border-t border-gray-700/60">
-              <h4 className="text-xs font-semibold text-gray-300 mb-2">Standort</h4>
-              <p className="text-xs text-gray-400 leading-relaxed">
-                {BUSINESS_INFO.address}
-              </p>
-            </div>
+            <h3 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Standort</h3>
+            <p className="text-xs text-gray-300 leading-relaxed mb-2.5 flex items-start gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-[#93B1A6] shrink-0 mt-0.5" />
+              <span>{BUSINESS_INFO.address}</span>
+            </p>
+            <p className="text-xs text-gray-400 leading-relaxed mb-3">
+              Zentral erreichbar nahe Friedrichstraße (Berlin-Mitte).
+            </p>
+            <a
+              href={`mailto:${BUSINESS_INFO.email}`}
+              className="text-xs text-[#93B1A6] hover:text-white transition font-medium underline"
+            >
+              {BUSINESS_INFO.email}
+            </a>
           </div>
         </div>
 
