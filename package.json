@@ -8,11 +8,14 @@
     "admin-dashboard"
   ],
   "scripts": {
+    "dev": "node scripts/dev.js",
+    "start": "node scripts/dev.js",
     "dev:public": "npm --prefix public-site run dev",
     "dev:admin": "npm --prefix admin-dashboard run dev",
     "build:public": "npm --prefix public-site run build",
     "build:admin": "npm --prefix admin-dashboard run build",
     "build": "npm --prefix public-site run build && npm --prefix admin-dashboard run build",
+    "preview": "node scripts/preview.js",
     "preview:public": "npm --prefix public-site run preview",
     "preview:admin": "npm --prefix admin-dashboard run preview"
   }
