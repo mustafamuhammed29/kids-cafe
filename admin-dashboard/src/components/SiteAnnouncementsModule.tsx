@@ -23,11 +23,128 @@ import {
   AlertTriangle,
   Flame,
   Check,
+  Sparkles,
+  ArrowRight,
+  X,
 } from 'lucide-react';
 
 interface SiteAnnouncementsModuleProps {
   currentRole: StaffRole;
 }
+
+// Interactive Live Preview of the Floating Marquee Capsule Banner
+const AnnouncementCapsulePreview: React.FC<{
+  message: string;
+  type?: AnnouncementType;
+  linkText?: string;
+  linkUrl?: string;
+  isDemo?: boolean;
+}> = ({ message, type = 'info', linkText, isDemo }) => {
+  const typeConfig = {
+    urgent: {
+      badgeBg: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      dotBg: 'bg-rose-500',
+      label: 'Aktion / Wichtig',
+      icon: Flame,
+      pillStyle: 'bg-gradient-to-r from-slate-950/95 via-rose-950/80 to-slate-950/95 border-rose-500/30 text-rose-100 shadow-[0_4px_25px_rgba(244,63,94,0.25)]',
+      btnStyle: 'bg-rose-600 text-white shadow-rose-900/50',
+    },
+    warning: {
+      badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      dotBg: 'bg-amber-400',
+      label: 'Hinweis',
+      icon: AlertTriangle,
+      pillStyle: 'bg-gradient-to-r from-slate-950/95 via-amber-950/80 to-slate-950/95 border-amber-500/30 text-amber-100 shadow-[0_4px_25px_rgba(245,158,11,0.2)]',
+      btnStyle: 'bg-amber-500 text-slate-950 font-extrabold shadow-amber-900/50',
+    },
+    success: {
+      badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+      dotBg: 'bg-emerald-400',
+      label: 'Neuigkeit',
+      icon: CheckCircle2,
+      pillStyle: 'bg-gradient-to-r from-slate-950/95 via-emerald-950/80 to-slate-950/95 border-emerald-500/30 text-emerald-100 shadow-[0_4px_25px_rgba(16,185,129,0.2)]',
+      btnStyle: 'bg-emerald-500 text-white shadow-emerald-900/50',
+    },
+    info: {
+      badgeBg: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+      dotBg: 'bg-sky-400',
+      label: 'Haven News',
+      icon: Sparkles,
+      pillStyle: 'bg-gradient-to-r from-slate-950/95 via-sky-950/70 to-slate-950/95 border-sky-500/30 text-slate-100 shadow-[0_4px_25px_rgba(14,165,233,0.2)]',
+      btnStyle: 'bg-sky-500 text-white shadow-sky-950',
+    },
+  }[type || 'info'];
+
+  const IconComp = typeConfig.icon;
+
+  return (
+    <div className="w-full flex flex-col items-center gap-2">
+      <div
+        className={`relative max-w-3xl w-full rounded-full border backdrop-blur-xl px-3 sm:px-4 py-2 flex items-center justify-between gap-3 transition-all select-none ${typeConfig.pillStyle}`}
+      >
+        {/* Left Glowing Badge with Pulsing Live Dot */}
+        <div className="shrink-0 flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider border shadow-xs ${typeConfig.badgeBg}`}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${typeConfig.dotBg}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${typeConfig.dotBg}`} />
+            </span>
+            <IconComp className="w-3 h-3 shrink-0" />
+            <span className="hidden xs:inline">{typeConfig.label}</span>
+          </span>
+        </div>
+
+        {/* Center: Smooth Marquee Moving Text (الكتابة تمشي) */}
+        <div className="flex-1 overflow-hidden relative marquee-mask min-w-0 flex items-center">
+          <div className="animate-marquee py-0.5 flex items-center gap-8 sm:gap-12 text-xs sm:text-sm font-semibold tracking-wide">
+            <span className="flex items-center gap-3 shrink-0">
+              <span>{message}</span>
+              <span className="opacity-40 text-xs">✦</span>
+            </span>
+            <span className="flex items-center gap-3 shrink-0">
+              <span>{message}</span>
+              <span className="opacity-40 text-xs">✦</span>
+            </span>
+            <span className="flex items-center gap-3 shrink-0">
+              <span>{message}</span>
+              <span className="opacity-40 text-xs">✦</span>
+            </span>
+            <span className="flex items-center gap-3 shrink-0">
+              <span>{message}</span>
+              <span className="opacity-40 text-xs">✦</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Right CTA Button & Mock Close */}
+        <div className="shrink-0 flex items-center gap-2">
+          {linkText && (
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full shadow-md ${typeConfig.btnStyle}`}
+            >
+              <span>{linkText}</span>
+              <ArrowRight className="w-3 h-3" />
+            </span>
+          )}
+
+          <div
+            className="w-6 h-6 rounded-full flex items-center justify-center bg-white/5 text-slate-400 border border-white/10"
+          >
+            <X className="w-3 h-3" />
+          </div>
+        </div>
+      </div>
+      {isDemo && (
+        <span className="text-[11px] text-sky-400 font-semibold flex items-center gap-1">
+          <Sparkles className="w-3 h-3" />
+          Live-Vorschau: So bewegt sich der Text im runden Rahmen auf der Website (Hover pausiert)
+        </span>
+      )}
+    </div>
+  );
+};
 
 export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = ({ currentRole }) => {
   const canManage = currentRole === 'owner' || currentRole === 'admin';
@@ -51,6 +168,37 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
     loadData();
   }, []);
 
+  const TEMPLATE_PRESETS = [
+    {
+      title: '🎉 Herbstferien Öffnungszeiten',
+      message: '🍂 Herbstferien-Special: Wir haben ab sofort auch montags von 10:00 bis 19:00 Uhr für euch geöffnet!',
+      type: 'success' as AnnouncementType,
+      linkText: 'Öffnungszeiten',
+      linkUrl: '/#zeiten',
+    },
+    {
+      title: '🎂 Geburtstag-Aktion',
+      message: '✨ Exklusiv-Rabatt: Erhalte 10% Rabatt auf alle Geburtstagspakete bei Buchung vor dem 15. November!',
+      type: 'urgent' as AnnouncementType,
+      linkText: 'Jetzt buchen',
+      linkUrl: '/#pakete',
+    },
+    {
+      title: '☕ Bio-Waffeln & Barista-Kaffee',
+      message: '🧇 Frische Bio-Waffeln & neue Barista-Spezialitäten ab sofort täglich in unserem Eltern-Café erhältlich!',
+      type: 'info' as AnnouncementType,
+      linkText: 'Speisekarte',
+      linkUrl: '/#cafe',
+    },
+    {
+      title: '⚠️ Exklusiv-Event Ruhetag',
+      message: '🔒 Hinweis: Am kommenden Samstag ab 15:00 Uhr geschlossene Geburtstagsgesellschaft. Vormittags normal geöffnet!',
+      type: 'warning' as AnnouncementType,
+      linkText: 'Details',
+      linkUrl: '/#kontakt',
+    },
+  ];
+
   const handleStartCreate = () => {
     if (!canManage) return;
     setEditingItem({
@@ -62,6 +210,17 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
       startsAt: '',
       endsAt: '',
     });
+  };
+
+  const handleApplyPreset = (preset: typeof TEMPLATE_PRESETS[0]) => {
+    setEditingItem((prev) => ({
+      ...prev,
+      message: preset.message,
+      type: preset.type,
+      linkText: preset.linkText,
+      linkUrl: preset.linkUrl,
+      isActive: true,
+    }));
   };
 
   const handleStartEdit = (item: AdminAnnouncement) => {
@@ -172,6 +331,8 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
     }
   };
 
+  const activeAnnouncement = announcements.find((a) => a.isActive);
+
   if (isLoading) {
     return (
       <div className="bg-slate-900/90 rounded-2xl p-12 border border-slate-800 text-center text-slate-400">
@@ -247,6 +408,44 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
         )}
       </div>
 
+      {/* Interactive Live Preview of the Circular Marquee Banner */}
+      <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500" />
+            </span>
+            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+              <span>Live-Vorschau: Runder Rahmen &amp; Dynamische Laufschrift</span>
+              <Sparkles className="w-4 h-4 text-sky-400" />
+            </h3>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            So wird die Ankündigung oben auf der Website für Besucher angezeigt (Hover pausiert den Lauf)
+          </span>
+        </div>
+
+        <div className="p-4 sm:p-6 bg-slate-950/80 rounded-2xl border border-slate-800/80 flex items-center justify-center">
+          {activeAnnouncement ? (
+            <AnnouncementCapsulePreview
+              message={activeAnnouncement.message}
+              type={activeAnnouncement.type}
+              linkText={activeAnnouncement.linkText || undefined}
+              linkUrl={activeAnnouncement.linkUrl || undefined}
+            />
+          ) : (
+            <AnnouncementCapsulePreview
+              message="✨ Herbstferien-Aktion: 20% Rabatt auf alle Geburtstagspakete & verlängerte Spielzeiten im Haven Kids Café Berlin!"
+              type="info"
+              linkText="Jetzt buchen"
+              linkUrl="/#pakete"
+              isDemo={true}
+            />
+          )}
+        </div>
+      </div>
+
       {/* Announcements List */}
       <div className="space-y-4">
         {announcements.length === 0 ? (
@@ -273,17 +472,18 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
                     {getTypeBadge(item.type)}
 
                     {item.isActive ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
-                        <Eye className="w-3 h-3" /> Live aktiv
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/60">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Live aktiv auf Website
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
                         <EyeOff className="w-3 h-3" /> Deaktiviert
                       </span>
                     )}
 
                     {(item.startsAt || item.endsAt) && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-800/80 text-slate-300 border border-slate-700/60">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-800/80 text-slate-300 border border-slate-700/60">
                         <Calendar className="w-3 h-3 text-slate-400" />
                         {item.startsAt ? new Date(item.startsAt).toLocaleDateString('de-DE') : 'sofort'} bis{' '}
                         {item.endsAt ? new Date(item.endsAt).toLocaleDateString('de-DE') : 'unbegrenzt'}
@@ -296,7 +496,7 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
                   </p>
 
                   {(item.linkText || item.linkUrl) && (
-                    <div className="flex items-center gap-2 text-xs text-sky-300 bg-sky-950/50 px-3 py-1.5 rounded-xl border border-sky-800/60 w-fit">
+                    <div className="flex items-center gap-2 text-xs text-sky-300 bg-sky-950/50 px-3 py-1.5 rounded-full border border-sky-800/60 w-fit">
                       <LinkIcon className="w-3 h-3 text-sky-400" />
                       <span className="font-semibold">{item.linkText || 'Link'}:</span>
                       <span className="text-sky-400/80 font-mono text-[11px]">{item.linkUrl || '#'}</span>
@@ -346,8 +546,8 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
 
       {/* Edit / Create Modal */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-slate-800 space-y-5 animate-fadeIn">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-800 space-y-5 animate-fadeIn my-8">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <span className="text-[10px] uppercase font-bold text-sky-400 tracking-wider">Operative Steuerung</span>
@@ -364,10 +564,46 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
               </button>
             </div>
 
+            {/* Quick Template Presets */}
+            {!editingItem.id && (
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Schnell-Vorlagen (1-Klick übernehmen):
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {TEMPLATE_PRESETS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleApplyPreset(preset)}
+                      className="px-2.5 py-1 rounded-full border border-slate-700/80 bg-slate-800/60 hover:bg-sky-950 hover:border-sky-500/50 hover:text-sky-300 text-slate-300 text-[11px] font-medium transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3 text-sky-400" />
+                      <span>{preset.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Real-time preview inside modal */}
+            {editingItem.message && (
+              <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Echtzeit-Vorschau (Runder Rahmen &amp; Laufschrift):
+                </span>
+                <AnnouncementCapsulePreview
+                  message={editingItem.message}
+                  type={editingItem.type || 'info'}
+                  linkText={editingItem.linkText || undefined}
+                />
+              </div>
+            )}
+
             <form onSubmit={handleSaveModal} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Nachricht / Text <span className="text-rose-400">*</span>
+                  Nachricht / Text der Laufschrift <span className="text-rose-400">*</span>
                 </label>
                 <textarea
                   required
@@ -381,16 +617,16 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Typ</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Typ &amp; Farbdesign</label>
                   <select
                     value={editingItem.type || 'info'}
                     onChange={(e) => setEditingItem({ ...editingItem, type: e.target.value as AnnouncementType })}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-white focus:border-sky-500 outline-hidden font-medium"
                   >
-                    <option value="info">Info (Standard)</option>
-                    <option value="warning">Hinweis / Warnung</option>
-                    <option value="success">Erfolg / Aktion</option>
-                    <option value="urgent">Dringend</option>
+                    <option value="info">Info (Sky Blue Gradient)</option>
+                    <option value="warning">Hinweis / Warnung (Amber Gold)</option>
+                    <option value="success">Erfolg / Aktion (Emerald Grün)</option>
+                    <option value="urgent">Dringend / Hot (Rose Rot Glow)</option>
                   </select>
                 </div>
 
@@ -443,11 +679,11 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
               <div className="p-3.5 bg-slate-950/60 rounded-2xl border border-slate-800 space-y-3">
                 <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
                   <LinkIcon className="w-3.5 h-3.5 text-sky-400" />
-                  Optionaler Aktions-Link
+                  Optionaler Aktions-Button im Runden Rahmen
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] text-slate-400 font-medium mb-1">Link-Text</label>
+                    <label className="block text-[10px] text-slate-400 font-medium mb-1">Button-Beschriftung</label>
                     <input
                       type="text"
                       placeholder="z. B. Jetzt buchen"
@@ -460,7 +696,7 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
                     <label className="block text-[10px] text-slate-400 font-medium mb-1">Link-Ziel / URL</label>
                     <input
                       type="text"
-                      placeholder="z. B. /services oder /pricing"
+                      placeholder="z. B. /#pakete oder /#zeiten"
                       value={editingItem.linkUrl || ''}
                       onChange={(e) => setEditingItem({ ...editingItem, linkUrl: e.target.value })}
                       className="w-full text-xs p-2 rounded-lg border border-slate-700 bg-slate-900 text-white placeholder-slate-500"
@@ -483,7 +719,7 @@ export const SiteAnnouncementsModule: React.FC<SiteAnnouncementsModuleProps> = (
                   className="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold transition shadow-lg shadow-sky-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Speichern</span>
+                  <span>Speichern &amp; Veröffentlichen</span>
                 </button>
               </div>
             </form>
