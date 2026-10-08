@@ -85,12 +85,30 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
         // Keep current selected slot if still valid, otherwise pick first available
         setSelectedSlot((prev) => {
-          const match = data.find((s) => s.startTime === prev?.startTime);
-          if (match && match.isActive && match.availableCount >= childrenCount) {
-            return match;
+          const match = data.find((s) => s.startTime === prev?.startTime || s.id === prev?.id);
+          const nextSlot =
+            match && match.isActive && match.availableCount > 0
+              ? match
+              : data.find((s) => s.isActive && s.availableCount > 0) || data[0] || prev;
+
+          if (nextSlot) {
+            const free =
+              typeof nextSlot.availableCount === 'number'
+                ? nextSlot.availableCount
+                : nextSlot.maxCapacity - nextSlot.bookedCount;
+            const serviceLimit = selectedService.maxChildren || 6;
+            const maxForSlot = Math.max(1, Math.min(serviceLimit, free > 0 ? free : 1));
+            setChildrenCount((currCount) => {
+              if (currCount > maxForSlot) {
+                const newAges = [...childrenAges].slice(0, maxForSlot);
+                setChildrenAges(newAges);
+                return maxForSlot;
+              }
+              return currCount;
+            });
           }
-          const available = data.find((s) => s.isActive && s.availableCount >= childrenCount);
-          return available || data[0] || prev;
+
+          return nextSlot;
         });
       })
       .catch((err) => {
@@ -101,7 +119,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, selectedDate, selectedService.slug, selectedService.id, childrenCount]);
+  }, [isOpen, selectedDate, selectedService.slug, selectedService.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -117,6 +135,40 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
+
+  // Helper to format date in German
+  const formatDateGerman = (dateStr: string): string => {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+      }
+    } catch {
+      // fallback
+    }
+    return dateStr;
+  };
+
+  // Helper: Get free spots in currently selected slot or specified slot
+  const getSlotFreeCapacity = (targetSlot?: TimeSlot | null): number => {
+    const slot = targetSlot || selectedSlot;
+    if (!slot) return 20;
+    const match = slotsList.find((s) => s.startTime === slot.startTime || s.id === slot.id) || slot;
+    const free =
+      typeof (match as any).availableCount === 'number'
+        ? (match as any).availableCount
+        : match.maxCapacity - match.bookedCount;
+    return Math.max(0, free);
+  };
+
+  // Helper: Get maximum allowable children based on package limit AND slot free seats
+  const getMaxAllowedChildren = (targetSlot?: TimeSlot | null): number => {
+    const freeInSlot = getSlotFreeCapacity(targetSlot);
+    const serviceLimit = selectedService.maxChildren || 6;
+    if (freeInSlot <= 0) return 1;
+    return Math.max(1, Math.min(serviceLimit, freeInSlot));
+  };
 
   // Price Calculation Logic
   const calculateTotal = (): number => {
@@ -141,9 +193,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
   const totalPrice = calculateTotal();
 
-  // Child ages handler
-  const handleChildrenCountChange = (count: number) => {
-    const validCount = Math.max(1, Math.min(6, count));
+  // Child ages handler strictly respecting remaining slot capacity
+  const handleChildrenCountChange = (count: number, targetSlot?: TimeSlot | null) => {
+    const maxAllowed = getMaxAllowedChildren(targetSlot);
+    const validCount = Math.max(1, Math.min(maxAllowed, count));
     setChildrenCount(validCount);
     const newAges = [...childrenAges];
     while (newAges.length < validCount) newAges.push(3);
@@ -445,11 +498,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                           isActive: true,
                         }))
                     ).map((slot) => {
-                      const isSelected = selectedSlot?.startTime === slot.startTime;
+                      const isSelected = selectedSlot?.startTime === slot.startTime || selectedSlot?.id === slot.id;
                       const isFull = slot.bookedCount >= slot.maxCapacity || slot.availableCount <= 0;
                       const isDeactivated = slot.isActive === false;
-                      const isNotEnoughSeats = !isFull && !isDeactivated && slot.availableCount < childrenCount;
-                      const isBlocked = isFull || isDeactivated || isNotEnoughSeats;
+                      const isBlocked = isFull || isDeactivated;
 
                       return (
                         <button
@@ -459,6 +511,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                           onClick={() => {
                             if (!isBlocked) {
                               setSelectedSlot(slot);
+                              // Sync children count if current count exceeds slot's remaining free capacity
+                              const slotFree =
+                                typeof slot.availableCount === 'number'
+                                  ? slot.availableCount
+                                  : slot.maxCapacity - slot.bookedCount;
+                              const serviceLimit = selectedService.maxChildren || 6;
+                              const maxAllowedForSlot = Math.min(serviceLimit, slotFree > 0 ? slotFree : 1);
+                              if (childrenCount > maxAllowedForSlot) {
+                                handleChildrenCountChange(maxAllowedForSlot, slot);
+                              }
                             }
                           }}
                           className={`p-4 sm:p-5 rounded-2xl border-2 transition text-center min-h-[100px] flex flex-col justify-center items-center relative w-full ${
@@ -486,9 +548,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                               <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-100 text-rose-600">
                                 Ausgebucht
                               </span>
-                            ) : isNotEnoughSeats ? (
+                            ) : slot.availableCount <= 2 ? (
                               <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
-                                Nur {slot.availableCount} {slot.availableCount === 1 ? 'Platz' : 'Plätze'} frei
+                                Nur noch {slot.availableCount} {slot.availableCount === 1 ? 'Platz' : 'Plätze'} frei
                               </span>
                             ) : (
                               <span className="text-xs text-[#0EA5E9] font-bold block">
@@ -509,20 +571,20 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
               {(() => {
                 const currentMatch = (slotsList.length > 0 ? slotsList : []).find(
-                  (s) => s.startTime === selectedSlot?.startTime
+                  (s) => s.startTime === selectedSlot?.startTime || s.id === selectedSlot?.id
                 );
                 const isSelectedBlocked =
                   !selectedSlot ||
                   (currentMatch &&
                     (!currentMatch.isActive ||
                       currentMatch.bookedCount >= currentMatch.maxCapacity ||
-                      currentMatch.availableCount < childrenCount));
+                      currentMatch.availableCount <= 0));
 
                 return (
                   <div>
                     {isSelectedBlocked && (
                       <p className="text-xs text-rose-500 font-bold mb-3 text-center">
-                        Der aktuell gewählte Zeitslot ist für {childrenCount} Kinder nicht verfügbar. Bitte wähle einen freien Slot.
+                        Der aktuell gewählte Zeitslot ist leider ausgebucht oder gesperrt. Bitte wähle einen freien Slot.
                       </p>
                     )}
                     <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md pt-3 pb-safe border-t border-slate-100 mt-6 flex items-center justify-between gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] px-4 -mx-4 sm:mx-0 sm:px-0 sm:shadow-none sm:border-t-0 sm:static">
@@ -553,8 +615,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           {/* STEP 3: CHILDREN, COMPANIONS & ADD-ONS */}
           {step === 3 && (
             <div className="space-y-6 animate-fadeIn">
-              <div className="text-center max-w-lg mx-auto mb-5">
-                <h3 className="font-extrabold text-2xl mb-2 text-[#0F172A]">
+              <div className="text-center max-w-lg mx-auto mb-2">
+                <h3 className="font-extrabold text-2xl mb-1 text-[#0F172A]">
                   Kinder, Begleitpersonen & Extras
                 </h3>
                 <p className="text-sm text-slate-600">
@@ -562,67 +624,166 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 </p>
               </div>
 
-              {/* Children counter */}
-              <div className="bg-slate-50 rounded-2xl p-5 sm:p-6 border border-slate-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <label className="font-bold text-base text-[#0F172A] block">
-                      Anzahl Kinder (0–8 Jahre)
-                    </label>
-                    <span className="text-sm text-slate-500">
-                      Basispreis {selectedService.basePrice || 14} € je Kind
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleChildrenCountChange(childrenCount - 1)}
-                      className="w-11 h-11 rounded-xl bg-white border border-slate-200 font-bold text-xl flex items-center justify-center hover:bg-slate-100 cursor-pointer min-h-[46px] min-w-[46px] shadow-2xs"
-                    >
-                      -
-                    </button>
-                    <span className="font-extrabold text-xl w-7 text-center">
-                      {childrenCount}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleChildrenCountChange(childrenCount + 1)}
-                      className="w-11 h-11 rounded-xl bg-white border border-slate-200 font-bold text-xl flex items-center justify-center hover:bg-slate-100 cursor-pointer min-h-[46px] min-w-[46px] shadow-2xs"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
+              {/* Selected Slot & Free Capacity Context Card */}
+              {(() => {
+                const slotFreeSpots = getSlotFreeCapacity();
+                const isVeryLowCapacity = slotFreeSpots <= 2;
 
-                {/* Ages array */}
-                <div className="pt-3.5 border-t border-slate-200/80">
-                  <span className="text-sm font-semibold text-slate-700 block mb-2.5">
-                    Alter der Kinder (zur Vorbereitung der Spielzonen):
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {childrenAges.map((age, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200">
-                        <span className="text-xs sm:text-sm text-slate-500 font-medium whitespace-nowrap">Kind {idx + 1}:</span>
-                        <select
-                          value={age}
-                          onChange={(e) => handleAgeChange(idx, parseInt(e.target.value, 10))}
-                          className="w-full text-sm font-bold bg-transparent outline-hidden min-h-[38px] cursor-pointer"
-                        >
-                          <option value={0}>Baby (&lt; 1 Jahr)</option>
-                          <option value={1}>1 Jahr</option>
-                          <option value={2}>2 Jahre</option>
-                          <option value={3}>3 Jahre</option>
-                          <option value={4}>4 Jahre</option>
-                          <option value={5}>5 Jahre</option>
-                          <option value={6}>6 Jahre</option>
-                          <option value={7}>7 Jahre</option>
-                          <option value={8}>8 Jahre</option>
-                        </select>
+                return (
+                  <div className="bg-gradient-to-r from-sky-50/90 via-white to-sky-50/50 border border-sky-100/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-sky-700 bg-sky-100/80 px-2.5 py-0.5 rounded-full inline-block">
+                          Gewähltes Zeitfenster
+                        </span>
+                        {isVeryLowCapacity ? (
+                          <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            🔥 Nur noch {slotFreeSpots} {slotFreeSpots === 1 ? 'Platz' : 'Plätze'} frei!
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            ✓ {slotFreeSpots} freie Plätze
+                          </span>
+                        )}
                       </div>
-                    ))}
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-bold text-[#0F172A] pt-1">
+                        <span className="flex items-center gap-1.5">
+                          <CalendarIcon className="w-4 h-4 text-[#0EA5E9]" />
+                          {formatDateGerman(selectedDate)}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-[#0EA5E9]" />
+                          {selectedSlot.startTime} – {selectedSlot.endTime} Uhr
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setStep(2)}
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-sky-700 bg-white hover:bg-sky-50 border border-sky-200 px-3.5 py-2.5 rounded-xl transition shadow-2xs cursor-pointer self-start sm:self-center shrink-0"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-sky-500" />
+                      <span>Zeitslot ändern</span>
+                    </button>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
+
+              {/* Children counter */}
+              {(() => {
+                const slotFreeSpots = getSlotFreeCapacity();
+                const maxAllowedChildren = getMaxAllowedChildren();
+                const isAtCapacityLimit = childrenCount >= maxAllowedChildren;
+                const isSlotBottleNeck = slotFreeSpots < (selectedService.maxChildren || 6);
+
+                return (
+                  <div className="bg-slate-50 rounded-2xl p-5 sm:p-6 border border-slate-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <label className="font-bold text-base text-[#0F172A] block">
+                            Anzahl Kinder (0–8 Jahre)
+                          </label>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-md">
+                            Max. {maxAllowedChildren} frei
+                          </span>
+                        </div>
+                        <span className="text-sm text-slate-500 block mt-0.5">
+                          Basispreis {selectedService.basePrice || 14} € je Kind
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={childrenCount <= 1}
+                          onClick={() => handleChildrenCountChange(childrenCount - 1)}
+                          className={`w-11 h-11 rounded-xl bg-white border font-bold text-xl flex items-center justify-center transition min-h-[46px] min-w-[46px] shadow-2xs ${
+                            childrenCount <= 1
+                              ? 'border-slate-200 bg-slate-100 text-slate-300 opacity-40 cursor-not-allowed'
+                              : 'border-slate-200 text-slate-800 hover:bg-slate-100 cursor-pointer'
+                          }`}
+                        >
+                          -
+                        </button>
+                        <span className="font-extrabold text-xl w-7 text-center text-[#0F172A]">
+                          {childrenCount}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={isAtCapacityLimit}
+                          onClick={() => handleChildrenCountChange(childrenCount + 1)}
+                          className={`w-11 h-11 rounded-xl bg-white border font-bold text-xl flex items-center justify-center transition min-h-[46px] min-w-[46px] shadow-2xs ${
+                            isAtCapacityLimit
+                              ? 'border-slate-200 bg-slate-100 text-slate-300 opacity-40 cursor-not-allowed'
+                              : 'border-slate-200 text-slate-800 hover:bg-slate-100 cursor-pointer'
+                          }`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Capacity notice if limit reached */}
+                    {isAtCapacityLimit && (
+                      <div className="mb-4">
+                        {isSlotBottleNeck ? (
+                          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left">
+                            <div className="flex items-start gap-2.5 text-amber-900 text-xs font-semibold">
+                              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                              <span>
+                                Kapazitätsgrenze für diesen Zeitslot ({selectedSlot.startTime}–{selectedSlot.endTime} Uhr) erreicht: Maximal <strong>{slotFreeSpots} {slotFreeSpots === 1 ? 'Platz' : 'Plätze'}</strong> verfügbar.
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setStep(2)}
+                              className="text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition shrink-0 cursor-pointer whitespace-nowrap self-stretch sm:self-auto text-center"
+                            >
+                              Zeitslot wechseln →
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500 flex items-center gap-1.5 bg-slate-100/70 p-2.5 rounded-xl border border-slate-200/50">
+                            <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span>Maximale Kinderanzahl von {selectedService.maxChildren || 6} für dieses Paket erreicht.</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Ages array */}
+                    <div className="pt-3.5 border-t border-slate-200/80">
+                      <span className="text-sm font-semibold text-slate-700 block mb-2.5">
+                        Alter der Kinder (zur Vorbereitung der Spielzonen):
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {childrenAges.map((age, idx) => (
+                          <div key={idx} className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200">
+                            <span className="text-xs sm:text-sm text-slate-500 font-medium whitespace-nowrap">Kind {idx + 1}:</span>
+                            <select
+                              value={age}
+                              onChange={(e) => handleAgeChange(idx, parseInt(e.target.value, 10))}
+                              className="w-full text-sm font-bold bg-transparent outline-hidden min-h-[38px] cursor-pointer"
+                            >
+                              <option value={0}>Baby (&lt; 1 Jahr)</option>
+                              <option value={1}>1 Jahr</option>
+                              <option value={2}>2 Jahre</option>
+                              <option value={3}>3 Jahre</option>
+                              <option value={4}>4 Jahre</option>
+                              <option value={5}>5 Jahre</option>
+                              <option value={6}>6 Jahre</option>
+                              <option value={7}>7 Jahre</option>
+                              <option value={8}>8 Jahre</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Adults counter */}
               <div className="bg-slate-50 rounded-2xl p-5 sm:p-6 border border-slate-100 flex items-center justify-between">
@@ -637,8 +798,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
+                    disabled={adultsCount <= 1}
                     onClick={() => setAdultsCount(Math.max(1, adultsCount - 1))}
-                    className="w-11 h-11 rounded-xl bg-white border border-slate-200 font-bold text-xl flex items-center justify-center hover:bg-slate-100 cursor-pointer min-h-[46px] min-w-[46px] shadow-2xs"
+                    className={`w-11 h-11 rounded-xl bg-white border font-bold text-xl flex items-center justify-center transition min-h-[46px] min-w-[46px] shadow-2xs ${
+                      adultsCount <= 1
+                        ? 'border-slate-200 bg-slate-100 text-slate-300 opacity-40 cursor-not-allowed'
+                        : 'border-slate-200 text-slate-800 hover:bg-slate-100 cursor-pointer'
+                    }`}
                   >
                     -
                   </button>
@@ -647,8 +813,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setAdultsCount(adultsCount + 1)}
-                    className="w-11 h-11 rounded-xl bg-white border border-slate-200 font-bold text-xl flex items-center justify-center hover:bg-slate-100 cursor-pointer min-h-[46px] min-w-[46px] shadow-2xs"
+                    disabled={adultsCount >= 10}
+                    onClick={() => setAdultsCount(Math.min(10, adultsCount + 1))}
+                    className={`w-11 h-11 rounded-xl bg-white border font-bold text-xl flex items-center justify-center transition min-h-[46px] min-w-[46px] shadow-2xs ${
+                      adultsCount >= 10
+                        ? 'border-slate-200 bg-slate-100 text-slate-300 opacity-40 cursor-not-allowed'
+                        : 'border-slate-200 text-slate-800 hover:bg-slate-100 cursor-pointer'
+                    }`}
                   >
                     +
                   </button>
@@ -723,13 +894,37 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           {/* STEP 4: CONTACT & CONFIRMATION */}
           {step === 4 && (
             <form onSubmit={handleFinalizeBooking} className="space-y-5 animate-fadeIn">
-              <div className="text-center max-w-md mx-auto mb-3">
+              <div className="text-center max-w-md mx-auto mb-2">
                 <h3 className="font-extrabold text-xl mb-1 text-[#0F172A]">
                   Kontaktdaten für die Reservierung
                 </h3>
                 <p className="text-xs text-gray-500">
                   Wir senden dir die Buchungsbestätigung und Terminerinnerung per E-Mail.
                 </p>
+              </div>
+
+              {/* Compact Booking Overview Card */}
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span className="font-extrabold text-[#0F172A]">{selectedService.name}</span>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-semibold text-slate-700">{formatDateGerman(selectedDate)}</span>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-bold text-[#0EA5E9]">{selectedSlot.startTime} – {selectedSlot.endTime} Uhr</span>
+                  <span className="text-slate-300">•</span>
+                  <span>{childrenCount} {childrenCount === 1 ? 'Kind' : 'Kinder'}, {adultsCount} Erw.</span>
+                  {includeSaltRoom && <span className="font-semibold text-sky-600">(+ Salzraum)</span>}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-black text-sm text-[#0F172A]">{totalPrice} €</span>
+                  <button
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="text-xs font-bold text-sky-600 hover:text-sky-800 underline cursor-pointer"
+                  >
+                    Ändern
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-4">
