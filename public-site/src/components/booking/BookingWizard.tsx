@@ -96,8 +96,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               typeof nextSlot.availableCount === 'number'
                 ? nextSlot.availableCount
                 : nextSlot.maxCapacity - nextSlot.bookedCount;
-            const serviceLimit = selectedService.maxChildren || 6;
-            const maxForSlot = Math.max(1, Math.min(serviceLimit, free > 0 ? free : 1));
+            const slotCap = nextSlot.maxCapacity || BUSINESS_INFO.maxSlotCapacity || 20;
+            const maxForSlot = Math.max(1, Math.min(slotCap, free > 0 ? free : 1));
             setChildrenCount((currCount) => {
               if (currCount > maxForSlot) {
                 const newAges = [...childrenAges].slice(0, maxForSlot);
@@ -162,12 +162,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     return Math.max(0, free);
   };
 
-  // Helper: Get maximum allowable children based on package limit AND slot free seats
+  // Helper: Get maximum allowable children based strictly on slot free capacity (up to slot max capacity)
   const getMaxAllowedChildren = (targetSlot?: TimeSlot | null): number => {
     const freeInSlot = getSlotFreeCapacity(targetSlot);
-    const serviceLimit = selectedService.maxChildren || 6;
     if (freeInSlot <= 0) return 1;
-    return Math.max(1, Math.min(serviceLimit, freeInSlot));
+    const slot = targetSlot || selectedSlot;
+    const maxCapacity = slot?.maxCapacity || BUSINESS_INFO.maxSlotCapacity || 20;
+    return Math.max(1, Math.min(maxCapacity, freeInSlot));
   };
 
   // Price Calculation Logic
@@ -516,8 +517,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                                 typeof slot.availableCount === 'number'
                                   ? slot.availableCount
                                   : slot.maxCapacity - slot.bookedCount;
-                              const serviceLimit = selectedService.maxChildren || 6;
-                              const maxAllowedForSlot = Math.min(serviceLimit, slotFree > 0 ? slotFree : 1);
+                              const slotCap = slot.maxCapacity || BUSINESS_INFO.maxSlotCapacity || 20;
+                              const maxAllowedForSlot = Math.max(1, Math.min(slotCap, slotFree > 0 ? slotFree : 1));
                               if (childrenCount > maxAllowedForSlot) {
                                 handleChildrenCountChange(maxAllowedForSlot, slot);
                               }
@@ -676,7 +677,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 const slotFreeSpots = getSlotFreeCapacity();
                 const maxAllowedChildren = getMaxAllowedChildren();
                 const isAtCapacityLimit = childrenCount >= maxAllowedChildren;
-                const isSlotBottleNeck = slotFreeSpots < (selectedService.maxChildren || 6);
+                const slotMaxCap = selectedSlot?.maxCapacity || BUSINESS_INFO.maxSlotCapacity || 20;
+                const isSlotBottleNeck = slotFreeSpots < slotMaxCap;
 
                 return (
                   <div className="bg-slate-50 rounded-2xl p-5 sm:p-6 border border-slate-100">
@@ -747,7 +749,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                         ) : (
                           <p className="text-xs text-slate-500 flex items-center gap-1.5 bg-slate-100/70 p-2.5 rounded-xl border border-slate-200/50">
                             <AlertCircle className="w-4 h-4 text-slate-400 shrink-0" />
-                            <span>Maximale Kinderanzahl von {selectedService.maxChildren || 6} für dieses Paket erreicht.</span>
+                            <span>Maximale Raumkapazität von {slotMaxCap} Plätzen für diesen Zeitslot erreicht.</span>
                           </p>
                         )}
                       </div>
