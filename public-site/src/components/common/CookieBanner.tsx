@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 
-interface CookieBannerProps {
-  onOpenDatenschutz: () => void;
-}
-
-export const CookieBanner: React.FC<CookieBannerProps> = ({ onOpenDatenschutz }) => {
+export const CookieBanner: React.FC = () => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -41,13 +38,12 @@ export const CookieBanner: React.FC<CookieBannerProps> = ({ onOpenDatenschutz })
       </div>
 
       <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-800">
-        <button
-          type="button"
-          onClick={onOpenDatenschutz}
+        <Link
+          to="/datenschutz"
           className="text-xs text-accent hover:underline font-semibold cursor-pointer"
         >
           Datenschutz
-        </button>
+        </Link>
         <div className="flex gap-2">
           <button
             type="button"

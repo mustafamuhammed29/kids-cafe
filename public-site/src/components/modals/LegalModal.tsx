@@ -64,43 +64,43 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex border-b border-gray-200 bg-gray-50 px-6 pt-3 gap-3 overflow-x-auto">
+        {/* Tab Switcher - Responsive 3-Column Grid without horizontal overflow */}
+        <div className="grid grid-cols-3 border-b border-gray-200 bg-gray-50 px-2 sm:px-6 pt-2 sm:pt-3 gap-1 sm:gap-3">
           <button
             type="button"
             onClick={() => setActiveTab('impressum')}
-            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 min-h-[44px] ${
+            className={`pb-3 px-1 sm:px-3 text-xs sm:text-sm font-bold border-b-2 transition cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-h-[44px] ${
               activeTab === 'impressum'
                 ? 'border-primary text-dark'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
-            <FileText className="w-4 h-4" />
-            <span>Impressum</span>
+            <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Impressum</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('datenschutz')}
-            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 min-h-[44px] ${
+            className={`pb-3 px-1 sm:px-3 text-xs sm:text-sm font-bold border-b-2 transition cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-h-[44px] ${
               activeTab === 'datenschutz'
                 ? 'border-primary text-dark'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
-            <Shield className="w-4 h-4" />
-            <span>Datenschutzerklärung (DSGVO)</span>
+            <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">Datenschutz</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('agb')}
-            className={`pb-3 px-3 text-xs sm:text-sm font-bold border-b-2 transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 min-h-[44px] ${
+            className={`pb-3 px-1 sm:px-3 text-xs sm:text-sm font-bold border-b-2 transition cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-h-[44px] ${
               activeTab === 'agb'
                 ? 'border-primary text-dark'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
-            <Scale className="w-4 h-4" />
-            <span>AGB &amp; Besuchsregeln</span>
+            <Scale className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="truncate">AGB &amp; Regeln</span>
           </button>
         </div>
 

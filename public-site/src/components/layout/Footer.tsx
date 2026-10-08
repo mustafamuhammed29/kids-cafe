@@ -5,11 +5,10 @@ import { BUSINESS_INFO } from '../../data/mockData';
 import { getBusinessSettings, type BusinessSettings } from '../../services/contentService';
 
 interface FooterProps {
-  onOpenLegal: (tab: 'impressum' | 'datenschutz' | 'agb') => void;
-  onOpenBooking: () => void;
+  onOpenBooking?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenLegal }) => {
+export const Footer: React.FC<FooterProps> = () => {
   const [settings, setSettings] = useState<BusinessSettings | null>(null);
 
   useEffect(() => {
@@ -144,9 +143,9 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLegal }) => {
       <div className="mt-14 pt-8 border-t border-white/10 text-center text-xs sm:text-sm text-gray-500 flex flex-col md:flex-row justify-between items-center max-w-7xl mx-auto px-4 font-medium gap-4">
         <p>&copy; {new Date().getFullYear()} {businessName}. Alle Rechte vorbehalten.</p>
         <div className="space-x-6 flex flex-wrap justify-center gap-y-2 text-xs sm:text-sm">
-          <Link to="/datenschutz" onClick={() => onOpenLegal?.('datenschutz')} className="hover:text-white transition-colors cursor-pointer">Datenschutz</Link>
-          <Link to="/impressum" onClick={() => onOpenLegal?.('impressum')} className="hover:text-white transition-colors cursor-pointer">Impressum</Link>
-          <Link to="/agb" onClick={() => onOpenLegal?.('agb')} className="hover:text-white transition-colors cursor-pointer">AGB</Link>
+          <Link to="/datenschutz" className="hover:text-white transition-colors cursor-pointer">Datenschutz</Link>
+          <Link to="/impressum" className="hover:text-white transition-colors cursor-pointer">Impressum</Link>
+          <Link to="/agb" className="hover:text-white transition-colors cursor-pointer">AGB</Link>
         </div>
       </div>
     </footer>

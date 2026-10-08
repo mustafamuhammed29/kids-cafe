@@ -80,12 +80,11 @@ const AppContent: React.FC = () => {
       </main>
 
       <Footer
-        onOpenLegal={handleOpenLegal}
         onOpenBooking={() => handleOpenBooking()}
       />
 
-      {/* Mobile Bottom Navigation Bar: Hidden while booking wizard modal OR mobile hamburger menu is open */}
-      {!bookingWizardOpen && !isMobileMenuOpen && (
+      {/* Mobile Bottom Navigation Bar: Hidden while booking wizard modal OR mobile hamburger menu OR legal modal is open */}
+      {!bookingWizardOpen && !isMobileMenuOpen && !legalModalOpen && (
         <MobileBottomNav onOpenBooking={() => handleOpenBooking()} />
       )}
 
@@ -104,7 +103,7 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      <CookieBanner onOpenDatenschutz={() => handleOpenLegal('datenschutz')} />
+      <CookieBanner />
     </div>
   );
 };
