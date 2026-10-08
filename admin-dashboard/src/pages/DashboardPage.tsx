@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -33,6 +33,9 @@ import {
   ExternalLink,
   CheckCircle2,
   AlertCircle,
+  Filter,
+  RotateCcw,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface NavItem {
@@ -145,6 +148,9 @@ export const DashboardPage: React.FC = () => {
   const [bookings, setBookings] = useState<AdminBooking[]>(MOCK_ADMIN_BOOKINGS);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilterMode, setDateFilterMode] = useState<'all' | 'today' | 'tomorrow' | 'this_week' | 'custom'>('all');
+  const [customDate, setCustomDate] = useState<string>('');
+  const [slotFilter, setSlotFilter] = useState<string>('all');
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -214,16 +220,101 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  const filteredBookings = bookings.filter((b) => {
-    const matchesSearch =
-      b.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.referenceCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.customerEmail.toLowerCase().includes(searchTerm.toLowerCase());
+  // Dynamic list of available time slots
+  const availableTimeSlots = useMemo(() => {
+    const slots = new Set<string>();
+    bookings.forEach((b) => {
+      if (b.timeSlot) {
+        const clean = b.timeSlot.replace(/\s*Uhr$/i, '').trim();
+        if (clean) slots.add(clean);
+      }
+    });
+    ['10:00 - 12:00', '12:30 - 14:30', '14:00 - 17:00', '15:00 - 17:00', '18:00 - 20:00'].forEach((s) => slots.add(s));
+    return Array.from(slots).sort((a, b) => a.localeCompare(b));
+  }, [bookings]);
 
-    const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+  // Date helper functions
+  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  const getTomorrowStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  };
 
-    return matchesSearch && matchesStatus;
-  });
+  const isDateInThisWeek = (dateStr: string) => {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length !== 3) return false;
+      const target = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      const now = new Date();
+      const day = now.getDay() || 7; // Sunday is 7
+      const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day - 1));
+      mon.setHours(0, 0, 0, 0);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      sun.setHours(23, 59, 59, 999);
+      return target >= mon && target <= sun;
+    } catch {
+      return false;
+    }
+  };
+
+  const normalizeSlot = (str?: string) => (str || '').replace(/\s*Uhr$/i, '').trim();
+
+  const filteredBookings = useMemo(() => {
+    const today = getTodayStr();
+    const tomorrow = getTomorrowStr();
+
+    return bookings.filter((b) => {
+      // 1. Text Search
+      const term = searchTerm.toLowerCase().trim();
+      const matchesSearch =
+        !term ||
+        b.customerName.toLowerCase().includes(term) ||
+        b.referenceCode.toLowerCase().includes(term) ||
+        b.customerEmail.toLowerCase().includes(term) ||
+        (b.customerPhone && b.customerPhone.toLowerCase().includes(term));
+
+      // 2. Status Filter
+      const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+
+      // 3. Date Filter
+      let matchesDate = true;
+      if (dateFilterMode === 'today') {
+        matchesDate = b.date === today;
+      } else if (dateFilterMode === 'tomorrow') {
+        matchesDate = b.date === tomorrow;
+      } else if (dateFilterMode === 'this_week') {
+        matchesDate = isDateInThisWeek(b.date);
+      } else if (dateFilterMode === 'custom' && customDate) {
+        matchesDate = b.date === customDate;
+      }
+
+      // 4. Time Slot (Hours) Filter
+      let matchesSlot = true;
+      if (slotFilter !== 'all') {
+        const normFilter = normalizeSlot(slotFilter);
+        const normBooking = normalizeSlot(b.timeSlot);
+        matchesSlot = normBooking === normFilter || normBooking.startsWith(normFilter.split(' - ')[0]);
+      }
+
+      return matchesSearch && matchesStatus && matchesDate && matchesSlot;
+    });
+  }, [bookings, searchTerm, statusFilter, dateFilterMode, customDate, slotFilter]);
+
+  const hasActiveFilters =
+    searchTerm !== '' ||
+    statusFilter !== 'all' ||
+    dateFilterMode !== 'all' ||
+    slotFilter !== 'all';
+
+  const resetAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setDateFilterMode('all');
+    setCustomDate('');
+    setSlotFilter('all');
+  };
 
   const confirmedCount = bookings.filter((b) => b.status === 'confirmed').length;
   const pendingCount = bookings.filter((b) => b.status === 'pending').length;
@@ -556,58 +647,265 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Search, Filter & Segmented Tabs Bar */}
-              <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-                {/* Search Bar */}
-                <div className="relative flex-1 max-w-md">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Name, Buchungscode oder E-Mail suchen..."
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-700/80 bg-slate-950 text-white placeholder-slate-500 text-xs focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
-                  />
-                  {searchTerm && (
+              {/* Search, Date, Time Slot & Filter Bar */}
+              <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-4">
+                
+                {/* Row 1: Search, Specific Date Picker, Time Slot Dropdown, Reset */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
+                  
+                  {/* Search Input (5 cols on lg) */}
+                  <div className="lg:col-span-5 relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Name, Buchungscode oder E-Mail suchen..."
+                      className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-700/80 bg-slate-950 text-white placeholder-slate-500 text-xs focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition"
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="absolute right-3 top-3 text-slate-400 hover:text-white text-xs cursor-pointer"
+                        title="Suche leeren"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Date Picker Input (3 cols on lg) */}
+                  <div className="lg:col-span-3 relative flex items-center">
+                    <Calendar className="w-4 h-4 text-sky-400 absolute left-3.5 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={customDate}
+                      onChange={(e) => {
+                        setCustomDate(e.target.value);
+                        if (e.target.value) {
+                          setDateFilterMode('custom');
+                        } else {
+                          setDateFilterMode('all');
+                        }
+                      }}
+                      className="w-full pl-10 pr-8 py-2.5 rounded-xl border border-slate-700/80 bg-slate-950 text-white text-xs focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition cursor-pointer [color-scheme:dark]"
+                      title="Bestimmtes Datum filtern"
+                    />
+                    {customDate && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomDate('');
+                          setDateFilterMode('all');
+                        }}
+                        className="absolute right-3 text-slate-400 hover:text-white text-xs cursor-pointer"
+                        title="Datum zurücksetzen"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Time Slot (Stunden) Selector (3 cols on lg) */}
+                  <div className="lg:col-span-3 relative flex items-center">
+                    <Clock className="w-4 h-4 text-sky-400 absolute left-3.5 pointer-events-none" />
+                    <select
+                      value={slotFilter}
+                      onChange={(e) => setSlotFilter(e.target.value)}
+                      className="w-full pl-10 pr-8 py-2.5 rounded-xl border border-slate-700/80 bg-slate-950 text-white text-xs focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition cursor-pointer appearance-none"
+                    >
+                      <option value="all">Alle Zeitslots (Stunden)</option>
+                      {availableTimeSlots.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot} Uhr
+                        </option>
+                      ))}
+                    </select>
+                    {slotFilter !== 'all' ? (
+                      <button
+                        type="button"
+                        onClick={() => setSlotFilter('all')}
+                        className="absolute right-3 text-slate-400 hover:text-white text-xs cursor-pointer"
+                        title="Zeitslot-Filter zurücksetzen"
+                      >
+                        ✕
+                      </button>
+                    ) : (
+                      <div className="absolute right-3.5 pointer-events-none text-slate-500 text-[10px]">▼</div>
+                    )}
+                  </div>
+
+                  {/* Reset Button (1 col on lg) */}
+                  <div className="sm:col-span-2 lg:col-span-1">
                     <button
                       type="button"
-                      onClick={() => setSearchTerm('')}
-                      className="absolute right-3 top-3 text-slate-400 hover:text-white text-xs"
+                      disabled={!hasActiveFilters}
+                      onClick={resetAllFilters}
+                      className={`w-full py-2.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 ${
+                        hasActiveFilters
+                          ? 'bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500/25 cursor-pointer shadow-xs'
+                          : 'bg-slate-950/40 border border-slate-800/80 text-slate-600 cursor-not-allowed opacity-50'
+                      }`}
+                      title="Alle Filter zurücksetzen"
                     >
-                      ✕
+                      <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                      <span className="hidden sm:inline lg:hidden">Reset</span>
                     </button>
-                  )}
+                  </div>
                 </div>
 
-                {/* Segmented Filter Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-                  {[
-                    { id: 'all', label: 'Alle', count: bookings.length },
-                    { id: 'confirmed', label: 'Bestätigt', count: bookings.filter((b) => b.status === 'confirmed').length },
-                    { id: 'pending', label: 'Ausstehend', count: bookings.filter((b) => b.status === 'pending').length },
-                    { id: 'completed', label: 'Abgeschlossen', count: bookings.filter((b) => b.status === 'completed').length },
-                    { id: 'cancelled', label: 'Storniert', count: bookings.filter((b) => b.status === 'cancelled').length },
-                  ].map((tab) => {
-                    const isSelected = statusFilter === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setStatusFilter(tab.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                          isSelected
-                            ? 'bg-sky-500 text-white shadow-[0_0_15px_rgba(56,189,248,0.3)]'
-                            : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700'
-                        }`}
-                      >
-                        <span>{tab.label}</span>
-                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-900 text-slate-400'}`}>
-                          {tab.count}
-                        </span>
-                      </button>
-                    );
-                  })}
+                {/* Row 2: Quick Date Chips + Status Filter Pills */}
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pt-2.5 border-t border-slate-800/80">
+                  
+                  {/* Quick Date Chips */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0 scrollbar-none">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-sky-400" />
+                      Tag:
+                    </span>
+                    {[
+                      { id: 'all', label: 'Alle Tage' },
+                      { id: 'today', label: 'Heute' },
+                      { id: 'tomorrow', label: 'Morgen' },
+                      { id: 'this_week', label: 'Diese Woche' },
+                    ].map((chip) => {
+                      const isSelected = dateFilterMode === chip.id && !customDate;
+                      return (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          onClick={() => {
+                            setDateFilterMode(chip.id as any);
+                            setCustomDate('');
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1 ${
+                            isSelected
+                              ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-xs'
+                              : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          {chip.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Status Segmented Filter Pills */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0 scrollbar-none">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0 flex items-center gap-1">
+                      <SlidersHorizontal className="w-3 h-3 text-sky-400" />
+                      Status:
+                    </span>
+                    {[
+                      { id: 'all', label: 'Alle', count: bookings.length },
+                      { id: 'confirmed', label: 'Bestätigt', count: bookings.filter((b) => b.status === 'confirmed').length },
+                      { id: 'pending', label: 'Ausstehend', count: bookings.filter((b) => b.status === 'pending').length },
+                      { id: 'completed', label: 'Abgeschlossen', count: bookings.filter((b) => b.status === 'completed').length },
+                      { id: 'cancelled', label: 'Storniert', count: bookings.filter((b) => b.status === 'cancelled').length },
+                    ].map((tab) => {
+                      const isSelected = statusFilter === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setStatusFilter(tab.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-sky-500 text-white shadow-[0_0_15px_rgba(56,189,248,0.3)]'
+                              : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700'
+                          }`}
+                        >
+                          <span>{tab.label}</span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                              isSelected ? 'bg-white/20 text-white' : 'bg-slate-900 text-slate-400'
+                            }`}
+                          >
+                            {tab.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+
+                {/* Row 3: Active Filter Indicators Bar (shown when any filter is active) */}
+                {hasActiveFilters && (
+                  <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-800/60 text-xs">
+                    <span className="text-slate-400 font-medium flex items-center gap-1 shrink-0">
+                      <Filter className="w-3.5 h-3.5 text-sky-400" />
+                      Ergebnis: <strong className="text-white">{filteredBookings.length}</strong> von {bookings.length} Buchungen
+                    </span>
+
+                    {dateFilterMode !== 'all' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 font-semibold text-[11px]">
+                        📅 {dateFilterMode === 'today' ? 'Heute' : dateFilterMode === 'tomorrow' ? 'Morgen' : dateFilterMode === 'this_week' ? 'Diese Woche' : customDate}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDateFilterMode('all');
+                            setCustomDate('');
+                          }}
+                          className="hover:text-white cursor-pointer ml-0.5 text-sky-400"
+                          title="Tagesfilter entfernen"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    )}
+
+                    {slotFilter !== 'all' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 font-semibold text-[11px]">
+                        ⏰ {slotFilter} Uhr
+                        <button
+                          type="button"
+                          onClick={() => setSlotFilter('all')}
+                          className="hover:text-white cursor-pointer ml-0.5 text-sky-400"
+                          title="Zeitslot-Filter entfernen"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    )}
+
+                    {statusFilter !== 'all' && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-[11px]">
+                        Status: {statusFilter}
+                        <button
+                          type="button"
+                          onClick={() => setStatusFilter('all')}
+                          className="hover:text-white cursor-pointer ml-0.5 text-emerald-400"
+                          title="Status-Filter entfernen"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    )}
+
+                    {searchTerm && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold text-[11px]">
+                        Suche: "{searchTerm}"
+                        <button
+                          type="button"
+                          onClick={() => setSearchTerm('')}
+                          className="hover:text-white cursor-pointer ml-0.5 text-amber-400"
+                          title="Suchbegriff entfernen"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={resetAllFilters}
+                      className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer ml-auto"
+                    >
+                      Alle zurücksetzen
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* ===================================================================
