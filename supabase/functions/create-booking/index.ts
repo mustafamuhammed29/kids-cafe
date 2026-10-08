@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Supabase Edge Function: create-booking
 // Architectural & Security Invariants:
 // 1. Cloudflare Turnstile verification FAILS CLOSED in production.

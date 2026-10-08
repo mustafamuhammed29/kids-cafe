@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Supabase Edge Function: send-booking-confirmation
 // Automatically invoked via Database Webhook or Secure API on public.bookings INSERT
 // Uses Resend API for GDPR-compliant EU transactional email delivery
@@ -40,7 +41,7 @@ interface BookingPayload {
   };
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const origin = req.headers.get('Origin') || '';
   const isAllowed = isOriginAllowed(origin);
 
