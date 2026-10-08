@@ -42,16 +42,49 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     preSelectedService || SERVICES[0]
   );
 
-  // Default date to tomorrow
+  // Helper: Get local date formatted as YYYY-MM-DD
+  const getTodayLocalDate = (): string => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // Helper: Check if a date is strictly in the past (before today in local time)
+  const isDateInPast = (dateStr: string): boolean => {
+    if (!dateStr) return false;
+    return dateStr < getTodayLocalDate();
+  };
+
+  // Helper: Check if a specific slot on a given date has already passed
+  const isSlotInPast = (dateStr: string, slotStartTime: string, bufferMinutes = 0): boolean => {
+    if (!dateStr || !slotStartTime) return false;
+    const today = getTodayLocalDate();
+    if (dateStr < today) return true;
+    if (dateStr > today) return false;
+
+    // Same day: check start time against current local time
+    const now = new Date();
+    const [slotH, slotM] = slotStartTime.split(':').map(Number);
+    const slotDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), slotH || 0, slotM || 0, 0);
+    return slotDate.getTime() <= (now.getTime() + bufferMinutes * 60 * 1000);
+  };
+
+  // Default date to tomorrow in local time
   const getTomorrowString = () => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     // If tomorrow is Sunday, advance to Monday
     if (d.getDay() === 0) d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   };
 
   const [selectedDate, setSelectedDate] = useState<string>(getTomorrowString());
+  const [dateWarning, setDateWarning] = useState<string | null>(null);
   const [slotsList, setSlotsList] = useState<SlotAvailability[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState<boolean>(false);
   const [isDateBlocked, setIsDateBlocked] = useState<boolean>(false);
@@ -96,19 +129,25 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         setSlotsList(data);
         setIsLoadingSlots(false);
 
-        if (blockInfo.isBlocked) {
-          // If the date is blocked, invalidate current slot selection
+        if (blockInfo.isBlocked || isDateInPast(selectedDate)) {
+          // If the date is blocked or in the past, invalidate current slot selection
           setSelectedSlot(null as any);
           return;
         }
 
-        // Keep current selected slot if still valid, otherwise pick first available
+        // Keep current selected slot if still valid and future, otherwise pick first available future slot
         setSelectedSlot((prev) => {
           const match = data.find((s) => s.startTime === prev?.startTime || s.id === prev?.id);
+          const isMatchValid =
+            match &&
+            match.isActive &&
+            match.availableCount > 0 &&
+            !isSlotInPast(selectedDate, match.startTime);
+
           const nextSlot =
-            match && match.isActive && match.availableCount > 0
+            isMatchValid
               ? match
-              : data.find((s) => s.isActive && s.availableCount > 0) || data[0] || prev;
+              : data.find((s) => s.isActive && s.availableCount > 0 && !isSlotInPast(selectedDate, s.startTime)) || null;
 
           if (nextSlot) {
             const free =
@@ -127,7 +166,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             });
           }
 
-          return nextSlot;
+          return nextSlot as any;
         });
       })
       .catch((err) => {
@@ -237,6 +276,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
     if (isDateBlocked || !selectedSlot) {
       setSubmitError('An diesem Datum können keine Buchungen vorgenommen werden (Schließtag).');
+      return;
+    }
+
+    if (isDateInPast(selectedDate)) {
+      setSubmitError('Buchungen in der Vergangenheit sind nicht möglich. Bitte wähle ein gültiges Besuchsdatum.');
+      return;
+    }
+
+    if (isSlotInPast(selectedDate, selectedSlot.startTime)) {
+      setSubmitError('Der gewählte Zeitslot liegt heute bereits in der Vergangenheit. Bitte wähle einen zukünftigen Zeitslot.');
       return;
     }
 
@@ -465,17 +514,47 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
               {/* Date Input */}
               <div>
-                <label className="block text-sm font-bold text-slate-800 uppercase tracking-wide mb-2 flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4 text-[#0EA5E9]" />
-                  <span>Besuchsdatum *</span>
+                <label className="block text-sm font-bold text-slate-800 uppercase tracking-wide mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-[#0EA5E9]" />
+                    <span>Besuchsdatum *</span>
+                  </span>
+                  {selectedDate === getTodayLocalDate() && (
+                    <span className="text-xs font-bold text-sky-700 bg-sky-100/80 px-2.5 py-0.5 rounded-full border border-sky-200">
+                      Heute
+                    </span>
+                  )}
                 </label>
                 <input
                   type="date"
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getTodayLocalDate()}
                   value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-xl border border-slate-200 text-base font-semibold bg-white focus:ring-2 focus:ring-[#0EA5E9] focus:border-[#0EA5E9] min-h-[48px]"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const today = getTodayLocalDate();
+                    if (val && val < today) {
+                      setSelectedDate(today);
+                      setDateWarning('Datum liegt in der Vergangenheit. Es wurde das heutige Datum ausgewählt.');
+                      setTimeout(() => setDateWarning(null), 5000);
+                      return;
+                    }
+                    setDateWarning(null);
+                    setSelectedDate(val);
+                  }}
+                  className={`w-full px-4 py-3.5 rounded-xl border text-base font-semibold bg-white focus:ring-2 focus:ring-[#0EA5E9] focus:border-[#0EA5E9] min-h-[48px] ${
+                    isDateInPast(selectedDate) ? 'border-rose-400 bg-rose-50/40 text-rose-900' : 'border-slate-200 text-slate-800'
+                  }`}
                 />
+                {dateWarning && (
+                  <p className="text-xs font-bold text-rose-600 mt-1.5 flex items-center gap-1">
+                    <span>⚠️</span> <span>{dateWarning}</span>
+                  </p>
+                )}
+                {isDateInPast(selectedDate) && (
+                  <p className="text-xs font-bold text-rose-600 mt-1.5 flex items-center gap-1">
+                    <span>⚠️</span> <span>Dieses Datum liegt in der Vergangenheit. Bitte wähle ein Datum ab heute.</span>
+                  </p>
+                )}
                 <span className="text-xs text-slate-500 mt-1.5 block">
                   Hinweis: Sonntags Ruhetag (außer für geschlossene Geburtstagsgesellschaften).
                 </span>
@@ -496,7 +575,24 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   )}
                 </label>
 
-                {isDateBlocked ? (
+                {isDateInPast(selectedDate) ? (
+                  <div className="p-6 sm:p-8 rounded-2xl bg-rose-50 border-2 border-rose-200 text-center space-y-3 shadow-xs">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                      <CalendarX className="w-6 h-6 sm:w-7 sm:h-7" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-base sm:text-lg text-rose-950">
+                        Datum liegt in der Vergangenheit
+                      </h4>
+                      <p className="text-sm font-semibold text-rose-700 mt-1">
+                        Reservierungen für vergangene Tage können nicht angenommen werden.
+                      </p>
+                    </div>
+                    <p className="text-xs text-rose-600 font-medium max-w-md mx-auto">
+                      Bitte wähle im Kalender oben ein Datum ab heute oder einen zukünftigen Tag aus.
+                    </p>
+                  </div>
+                ) : isDateBlocked ? (
                   <div className="p-6 sm:p-8 rounded-2xl bg-rose-50 border-2 border-rose-200 text-center space-y-3 shadow-xs">
                     <div className="w-12 h-12 sm:w-14 sm:h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
                       <CalendarX className="w-6 h-6 sm:w-7 sm:h-7" />
@@ -529,13 +625,31 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center text-amber-800 text-xs font-semibold">
                     Für dieses Datum sind derzeit keine buchbaren Zeitslots verfügbar. Bitte wähle ein anderes Datum.
                   </div>
+                ) : slotsList.every((s) => isSlotInPast(selectedDate, s.startTime)) ? (
+                  <div className="p-6 sm:p-8 rounded-2xl bg-amber-50 border-2 border-amber-200 text-center space-y-3 shadow-xs">
+                    <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-base sm:text-lg text-amber-950">
+                        Alle Zeitslots für heute sind bereits vergangen
+                      </h4>
+                      <p className="text-sm font-semibold text-amber-800 mt-1">
+                        Für den heutigen Tag ({formatDateGerman(selectedDate)}) finden keine weiteren regulären Spielzeiten mehr statt.
+                      </p>
+                    </div>
+                    <p className="text-xs text-amber-700 font-medium max-w-md mx-auto">
+                      Bitte wähle im Kalender oben ein Besuchsdatum ab morgen, um freie Plätze zu buchen.
+                    </p>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {slotsList.map((slot) => {
+                      const isPast = isSlotInPast(selectedDate, slot.startTime);
                       const isSelected = selectedSlot?.startTime === slot.startTime || selectedSlot?.id === slot.id;
                       const isFull = slot.bookedCount >= slot.maxCapacity || slot.availableCount <= 0;
                       const isDeactivated = slot.isActive === false;
-                      const isBlocked = isFull || isDeactivated;
+                      const isBlocked = isFull || isDeactivated || isPast;
 
                       return (
                         <button
@@ -574,7 +688,11 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                           </span>
 
                           <div className="mt-1">
-                            {isDeactivated ? (
+                            {isPast ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-slate-200 text-slate-600">
+                                Vergangen
+                              </span>
+                            ) : isDeactivated ? (
                               <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-slate-200 text-slate-500">
                                 Gesperrt
                               </span>
@@ -594,7 +712,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                           </div>
 
                           <span className="text-[11px] text-slate-400 block mt-1 border-t border-slate-100 w-full pt-1">
-                            {isBlocked ? 'Nicht verfügbar' : 'danach 30m Lüftung'}
+                            {isPast ? 'Zeit abgelaufen' : isBlocked ? 'Nicht verfügbar' : 'danach 30m Lüftung'}
                           </span>
                         </button>
                       );
@@ -607,8 +725,12 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 const currentMatch = slotsList.find(
                   (s) => s.startTime === selectedSlot?.startTime || s.id === selectedSlot?.id
                 );
+                const isSelectedPast = selectedSlot ? isSlotInPast(selectedDate, selectedSlot.startTime) : false;
+                const isDatePast = isDateInPast(selectedDate);
                 const isSelectedBlocked =
                   isDateBlocked ||
+                  isDatePast ||
+                  isSelectedPast ||
                   !selectedSlot ||
                   (currentMatch &&
                     (!currentMatch.isActive ||
@@ -617,9 +739,17 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
                 return (
                   <div>
-                    {isDateBlocked ? (
+                    {isDatePast ? (
+                      <p className="text-xs text-rose-600 font-bold mb-3 text-center">
+                        ⚠️ Das gewählte Besuchsdatum liegt in der Vergangenheit.
+                      </p>
+                    ) : isDateBlocked ? (
                       <p className="text-xs text-rose-600 font-bold mb-3 text-center">
                         ⚠️ Dieses Datum ist als Schließtag markiert. Bitte wähle ein anderes Datum im Kalender.
+                      </p>
+                    ) : isSelectedPast ? (
+                      <p className="text-xs text-rose-500 font-bold mb-3 text-center">
+                        ⚠️ Der gewählte Zeitslot liegt heute bereits in der Vergangenheit. Bitte wähle einen freien Zeitslot.
                       </p>
                     ) : isSelectedBlocked ? (
                       <p className="text-xs text-rose-500 font-bold mb-3 text-center">
@@ -641,7 +771,15 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                         onClick={() => setStep(3)}
                         className="flex-1 sm:flex-none sm:w-auto bg-[#0F172A] hover:bg-[#1E293B] disabled:opacity-40 disabled:cursor-not-allowed text-white px-8 py-4 rounded-full font-bold text-base transition shadow-md flex items-center justify-center gap-2 cursor-pointer min-h-[50px]"
                       >
-                        <span>{isDateBlocked ? 'Tag geschlossen' : 'Weiter zu Personen & Extras'}</span>
+                        <span>
+                          {isDatePast
+                            ? 'Datum in Vergangenheit'
+                            : isDateBlocked
+                            ? 'Tag geschlossen'
+                            : isSelectedPast
+                            ? 'Zeitslot abgelaufen'
+                            : 'Weiter zu Personen & Extras'}
+                        </span>
                         <ArrowRight className="w-5 h-5" />
                       </button>
                     </div>

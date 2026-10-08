@@ -227,6 +227,30 @@ export async function submitBooking(
     };
   }
 
+  // Pre-validate that selected date is not in the past
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  
+  if (formData.date < todayStr) {
+    return {
+      success: false,
+      referenceCode: '',
+      error: 'Buchungen in der Vergangenheit sind nicht möglich. Bitte wähle ein gültiges Besuchsdatum.',
+    };
+  }
+
+  if (formData.date === todayStr) {
+    const [h, m] = slot.startTime.split(':').map(Number);
+    const slotDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h || 0, m || 0);
+    if (slotDate.getTime() <= now.getTime()) {
+      return {
+        success: false,
+        referenceCode: '',
+        error: 'Dieser Zeitslot liegt heute bereits in der Vergangenheit. Bitte wähle einen zukünftigen Zeitslot.',
+      };
+    }
+  }
+
   // Pre-validate that selected date is not blocked by admin
   const blockedCheck = await checkDateBlocked(formData.date);
   if (blockedCheck.isBlocked) {

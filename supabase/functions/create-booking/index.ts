@@ -206,6 +206,51 @@ serve(async (req: Request) => {
 
   const validated = parseResult.data;
 
+  // 5.1 Strict Timezone-Aware Past Date & Slot Check (Europe/Berlin)
+  try {
+    const berlinDateStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Berlin',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    if (validated.date < berlinDateStr) {
+      return new Response(
+        JSON.stringify({ error: 'Buchungen in der Vergangenheit sind nicht möglich.' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (validated.date === berlinDateStr) {
+      const startTimePart = validated.timeSlot.split('-')[0].trim();
+      const [startH, startM] = startTimePart.split(':').map(Number);
+
+      const berlinTimeFormatter = new Intl.DateTimeFormat('de-DE', {
+        timeZone: 'Europe/Berlin',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+      const [currentBerlinH, currentBerlinM] = berlinTimeFormatter.format(new Date()).split(':').map(Number);
+
+      if (startH < currentBerlinH || (startH === currentBerlinH && startM <= currentBerlinM)) {
+        return new Response(
+          JSON.stringify({ error: 'Dieser Zeitslot liegt heute bereits in der Vergangenheit.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+  } catch (tzErr) {
+    console.warn('[VALIDATION] Non-blocking timezone check warning:', tzErr);
+  }
+
   // 6. Cloudflare Turnstile Verification — STRICT FAIL-CLOSED IN PRODUCTION
   if (isProduction) {
     // In production, if TURNSTILE_SECRET_KEY is missing or unavailable, FAIL CLOSED!
