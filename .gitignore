@@ -31,3 +31,6 @@ dist-ssr
 supabase/.temp/
 scripts/*.png
 scripts/*.cjs
+scripts/capture_new_capacity.mjs
+scripts/capture_public_step2.mjs
+scripts/test_full_slot.mjs
