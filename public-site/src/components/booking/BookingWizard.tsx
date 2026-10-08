@@ -2,6 +2,7 @@ import React, { useState, useId, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Calendar as CalendarIcon,
+  CalendarX,
   Clock,
   CheckCircle2,
   Sparkles,
@@ -16,7 +17,12 @@ import {
 } from 'lucide-react';
 import { SERVICES, DEFAULT_TIME_SLOTS, BUSINESS_INFO } from '../../data/mockData';
 import type { ServiceItem, TimeSlot, BookingConfirmation, BookingFormData } from '../../types/booking';
-import { submitBooking, getAvailableTimeSlots, type SlotAvailability } from '../../services/bookingService';
+import {
+  submitBooking,
+  getAvailableTimeSlots,
+  checkDateBlocked,
+  type SlotAvailability,
+} from '../../services/bookingService';
 import { MedicalDisclaimer } from '../common/MedicalDisclaimer';
 import { TurnstileWidget } from './TurnstileWidget';
 
@@ -48,6 +54,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(getTomorrowString());
   const [slotsList, setSlotsList] = useState<SlotAvailability[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState<boolean>(false);
+  const [isDateBlocked, setIsDateBlocked] = useState<boolean>(false);
+  const [blockedReason, setBlockedReason] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot>(DEFAULT_TIME_SLOTS[0]);
   const [childrenCount, setChildrenCount] = useState<number>(1);
   const [adultsCount, setAdultsCount] = useState<number>(1);
@@ -71,17 +79,28 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   // Helper ID for accessibility
   const titleId = useId();
 
-  // Load available time slots dynamically from Supabase
+  // Load available time slots dynamically from Supabase & verify if date is blocked
   useEffect(() => {
     if (!isOpen) return;
     let isMounted = true;
     setIsLoadingSlots(true);
 
-    getAvailableTimeSlots(selectedDate, selectedService.slug || selectedService.id)
-      .then((data) => {
+    Promise.all([
+      checkDateBlocked(selectedDate),
+      getAvailableTimeSlots(selectedDate, selectedService.slug || selectedService.id),
+    ])
+      .then(([blockInfo, data]) => {
         if (!isMounted) return;
+        setIsDateBlocked(blockInfo.isBlocked);
+        setBlockedReason(blockInfo.reason || '');
         setSlotsList(data);
         setIsLoadingSlots(false);
+
+        if (blockInfo.isBlocked) {
+          // If the date is blocked, invalidate current slot selection
+          setSelectedSlot(null as any);
+          return;
+        }
 
         // Keep current selected slot if still valid, otherwise pick first available
         setSelectedSlot((prev) => {
@@ -215,6 +234,11 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const handleFinalizeBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!acceptedRules || isSubmitting) return;
+
+    if (isDateBlocked || !selectedSlot) {
+      setSubmitError('An diesem Datum können keine Buchungen vorgenommen werden (Schließtag).');
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -472,7 +496,24 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   )}
                 </label>
 
-                {isLoadingSlots && slotsList.length === 0 ? (
+                {isDateBlocked ? (
+                  <div className="p-6 sm:p-8 rounded-2xl bg-rose-50 border-2 border-rose-200 text-center space-y-3 shadow-xs">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                      <CalendarX className="w-6 h-6 sm:w-7 sm:h-7" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-base sm:text-lg text-rose-950">
+                        Schließtag – Haven Kids Café geschlossen
+                      </h4>
+                      <p className="text-sm font-semibold text-rose-700 mt-1">
+                        {blockedReason ? `Grund: ${blockedReason}` : 'An diesem Tag finden keine regulären Spielzeiten statt.'}
+                      </p>
+                    </div>
+                    <p className="text-xs text-rose-600 font-medium max-w-md mx-auto">
+                      Für den <strong className="text-rose-950 font-bold">{formatDateGerman(selectedDate)}</strong> können keine Reservierungen angenommen werden. Bitte wähle ein anderes Besuchsdatum im Kalender oben.
+                    </p>
+                  </div>
+                ) : isLoadingSlots && slotsList.length === 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[1, 2, 3].map((i) => (
                       <div
@@ -484,21 +525,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       </div>
                     ))}
                   </div>
-                ) : (slotsList.length > 0 ? slotsList : DEFAULT_TIME_SLOTS).length === 0 ? (
+                ) : slotsList.length === 0 ? (
                   <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center text-amber-800 text-xs font-semibold">
-                    Für dieses Datum sind derzeit keine buchbaren Zeitslots verfügbar.
+                    Für dieses Datum sind derzeit keine buchbaren Zeitslots verfügbar. Bitte wähle ein anderes Datum.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {(slotsList.length > 0
-                      ? slotsList
-                      : DEFAULT_TIME_SLOTS.map((s) => ({
-                          ...s,
-                          availableCount: s.maxCapacity - s.bookedCount,
-                          isAvailable: s.maxCapacity > s.bookedCount,
-                          isActive: true,
-                        }))
-                    ).map((slot) => {
+                    {slotsList.map((slot) => {
                       const isSelected = selectedSlot?.startTime === slot.startTime || selectedSlot?.id === slot.id;
                       const isFull = slot.bookedCount >= slot.maxCapacity || slot.availableCount <= 0;
                       const isDeactivated = slot.isActive === false;
@@ -571,10 +604,11 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
               </div>
 
               {(() => {
-                const currentMatch = (slotsList.length > 0 ? slotsList : []).find(
+                const currentMatch = slotsList.find(
                   (s) => s.startTime === selectedSlot?.startTime || s.id === selectedSlot?.id
                 );
                 const isSelectedBlocked =
+                  isDateBlocked ||
                   !selectedSlot ||
                   (currentMatch &&
                     (!currentMatch.isActive ||
@@ -583,11 +617,15 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
                 return (
                   <div>
-                    {isSelectedBlocked && (
+                    {isDateBlocked ? (
+                      <p className="text-xs text-rose-600 font-bold mb-3 text-center">
+                        ⚠️ Dieses Datum ist als Schließtag markiert. Bitte wähle ein anderes Datum im Kalender.
+                      </p>
+                    ) : isSelectedBlocked ? (
                       <p className="text-xs text-rose-500 font-bold mb-3 text-center">
                         Der aktuell gewählte Zeitslot ist leider ausgebucht oder gesperrt. Bitte wähle einen freien Slot.
                       </p>
-                    )}
+                    ) : null}
                     <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md pt-3 pb-safe border-t border-slate-100 mt-6 flex items-center justify-between gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] px-4 -mx-4 sm:mx-0 sm:px-0 sm:shadow-none sm:border-t-0 sm:static">
                       <button
                         type="button"
@@ -603,7 +641,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                         onClick={() => setStep(3)}
                         className="flex-1 sm:flex-none sm:w-auto bg-[#0F172A] hover:bg-[#1E293B] disabled:opacity-40 disabled:cursor-not-allowed text-white px-8 py-4 rounded-full font-bold text-base transition shadow-md flex items-center justify-center gap-2 cursor-pointer min-h-[50px]"
                       >
-                        <span>Weiter zu Personen & Extras</span>
+                        <span>{isDateBlocked ? 'Tag geschlossen' : 'Weiter zu Personen & Extras'}</span>
                         <ArrowRight className="w-5 h-5" />
                       </button>
                     </div>

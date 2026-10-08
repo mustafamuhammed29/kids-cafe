@@ -9,11 +9,17 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { signIn, isConfigured } = useAuth();
+  const { signIn, isConfigured, user, staffProfile, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/bookings';
+
+  React.useEffect(() => {
+    if (!isLoading && user && staffProfile?.role === 'owner' && staffProfile?.isActive) {
+      navigate('/bookings', { replace: true });
+    }
+  }, [user, staffProfile, isLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

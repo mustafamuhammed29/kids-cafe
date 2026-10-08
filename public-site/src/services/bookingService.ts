@@ -67,6 +67,45 @@ export async function getBookingPackages(): Promise<ServiceItem[]> {
   }
 }
 
+export interface BlockedDateInfo {
+  isBlocked: boolean;
+  reason?: string;
+}
+
+/**
+ * Check if a specific date is marked as blocked (Schließtag) by the admin
+ */
+export async function checkDateBlocked(date: string): Promise<BlockedDateInfo> {
+  if (!isSupabaseConfigured || !date) {
+    return { isBlocked: false };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('blocked_dates')
+      .select('date, reason')
+      .eq('date', date)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Error checking blocked date:', error.message);
+      return { isBlocked: false };
+    }
+
+    if (data) {
+      return {
+        isBlocked: true,
+        reason: data.reason || 'Schließtag / Betriebsruhe',
+      };
+    }
+
+    return { isBlocked: false };
+  } catch (err) {
+    console.error('Exception checking blocked date:', err);
+    return { isBlocked: false };
+  }
+}
+
 /**
  * Fetch available time slots for a given date and service from Supabase
  */
@@ -95,6 +134,19 @@ export async function getAvailableTimeSlots(
   }
 
   try {
+    // 1. Strictly check if the entire day is blocked by admin in blocked_dates table
+    const { data: blockedRow, error: blockedErr } = await supabase
+      .from('blocked_dates')
+      .select('date, reason')
+      .eq('date', date)
+      .maybeSingle();
+
+    if (!blockedErr && blockedRow) {
+      // Entire day is closed / blocked! Return empty slots array
+      return [];
+    }
+
+    // 2. Query customized time_slots for this date
     const { data, error } = await supabase
       .from('time_slots')
       .select('id, start_time, end_time, service_id, max_capacity, booked_count, is_active')
@@ -134,7 +186,7 @@ export async function getAvailableTimeSlots(
         });
     }
 
-    // Default slots for fresh dates
+    // Default slots for fresh, unblocked dates
     return DEFAULT_TIME_SLOTS.map((slot) => ({
       id: slot.id,
       startTime: slot.startTime,
@@ -148,17 +200,7 @@ export async function getAvailableTimeSlots(
     }));
   } catch (err) {
     console.error('Error fetching available time slots:', err);
-    return DEFAULT_TIME_SLOTS.map((slot) => ({
-      id: slot.id,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      maxCapacity: defaultMaxCap,
-      bookedCount: slot.bookedCount,
-      availableCount: Math.max(0, defaultMaxCap - slot.bookedCount),
-      isActive: true,
-      isAvailable: Math.max(0, defaultMaxCap - slot.bookedCount) > 0,
-      cleaningBuffer: slot.cleaningBuffer,
-    }));
+    return [];
   }
 }
 
@@ -182,6 +224,16 @@ export async function submitBooking(
     return {
       success: true,
       referenceCode: generatedRef,
+    };
+  }
+
+  // Pre-validate that selected date is not blocked by admin
+  const blockedCheck = await checkDateBlocked(formData.date);
+  if (blockedCheck.isBlocked) {
+    return {
+      success: false,
+      referenceCode: '',
+      error: `An diesem Datum hat das Haven Kids Café geschlossen (${blockedCheck.reason || 'Ruhetag/Schließtag'}). Bitte wähle ein anderes Datum.`,
     };
   }
 

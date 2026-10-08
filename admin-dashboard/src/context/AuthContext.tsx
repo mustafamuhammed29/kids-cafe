@@ -16,11 +16,73 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const STAFF_PROFILE_STORAGE_KEY = 'haven_kids_staff_profile';
+const DEV_SESSION_STORAGE_KEY = 'haven_kids_dev_owner_session';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  // Sync initialization from localStorage so that on browser refresh (F5),
+  // user & profile are IMMEDIATELY available and ProtectedRoute never prematurely redirects.
+  const [user, setUser] = useState<User | null>(() => {
+    if (!isSupabaseConfigured) {
+      try {
+        const stored = localStorage.getItem(DEV_SESSION_STORAGE_KEY) || sessionStorage.getItem(DEV_SESSION_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.user) return parsed.user;
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+
   const [session, setSession] = useState<Session | null>(null);
-  const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(null);
+
+  const [staffProfile, setStaffProfile] = useState<StaffProfile | null>(() => {
+    try {
+      if (!isSupabaseConfigured) {
+        const stored = localStorage.getItem(DEV_SESSION_STORAGE_KEY) || sessionStorage.getItem(DEV_SESSION_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.profile?.role === 'owner' && parsed?.profile?.isActive) {
+            return parsed.profile;
+          }
+        }
+      } else {
+        const cached = localStorage.getItem(STAFF_PROFILE_STORAGE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.role === 'owner' && parsed.isActive) {
+            return parsed;
+          }
+        }
+      }
+    } catch {
+      // ignore JSON parse errors
+    }
+    return null;
+  });
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Helper to persist or clear cached staff profile in localStorage
+  const saveStaffProfile = (profile: StaffProfile | null) => {
+    setStaffProfile(profile);
+    if (profile) {
+      try {
+        localStorage.setItem(STAFF_PROFILE_STORAGE_KEY, JSON.stringify(profile));
+      } catch (e) {
+        console.error('Failed to cache staff profile:', e);
+      }
+    } else {
+      try {
+        localStorage.removeItem(STAFF_PROFILE_STORAGE_KEY);
+      } catch (e) {
+        console.error('Failed to remove cached staff profile:', e);
+      }
+    }
+  };
 
   // Fetch verified staff profile from database
   const fetchStaffProfile = async (userId: string): Promise<StaffProfile | null> => {
@@ -32,27 +94,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*')
         .eq('id', userId)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
-        console.warn('User has no active staff record in staff_members table:', error);
-        setStaffProfile(null);
+      if (error) {
+        console.warn('Error querying staff_members:', error.message);
+        // Do NOT clear cached profile on transient network errors
+        const cached = localStorage.getItem(STAFF_PROFILE_STORAGE_KEY);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed?.id === userId && parsed?.role === 'owner' && parsed?.isActive) {
+              return parsed;
+            }
+          } catch {
+            // ignore
+          }
+        }
         return null;
-      } else {
-        const profile: StaffProfile = {
-          id: data.id,
-          email: data.email,
-          fullName: data.full_name || 'Staff Member',
-          role: data.role,
-          isActive: data.is_active,
-          createdAt: data.created_at,
-        };
-        setStaffProfile(profile);
-        return profile;
       }
+
+      if (!data) {
+        console.warn('User has no active staff record in staff_members table.');
+        saveStaffProfile(null);
+        return null;
+      }
+
+      const profile: StaffProfile = {
+        id: data.id,
+        email: data.email,
+        fullName: data.full_name || 'Inhaber (Owner)',
+        role: data.role,
+        isActive: data.is_active,
+        createdAt: data.created_at,
+      };
+
+      saveStaffProfile(profile);
+      return profile;
     } catch (err) {
       console.error('Error fetching staff profile:', err);
-      setStaffProfile(null);
       return null;
     }
   };
@@ -60,82 +139,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isMounted = true;
 
-    const initializeAuth = async () => {
-      if (!isSupabaseConfigured) {
-        try {
-          const stored = localStorage.getItem('haven_kids_dev_owner_session') || sessionStorage.getItem('haven_kids_dev_owner_session');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (parsed?.user && parsed?.profile?.role === 'owner' && parsed?.profile?.isActive) {
-              if (isMounted) {
-                setUser(parsed.user);
-                setStaffProfile(parsed.profile);
-              }
-              localStorage.setItem('haven_kids_dev_owner_session', stored);
-            } else {
-              localStorage.removeItem('haven_kids_dev_owner_session');
-              sessionStorage.removeItem('haven_kids_dev_owner_session');
-            }
-          }
-        } catch (e) {
-          console.error('Failed to parse dev session:', e);
-          localStorage.removeItem('haven_kids_dev_owner_session');
-          sessionStorage.removeItem('haven_kids_dev_owner_session');
-        } finally {
-          if (isMounted) setIsLoading(false);
-        }
-        return;
-      }
-
-      // Production Supabase Auth: Await session AND owner verification before releasing loading state
-      try {
-        const { data: { session: existingSession } } = await supabase.auth.getSession();
-        if (existingSession?.user) {
-          if (isMounted) {
-            setSession(existingSession);
-            setUser(existingSession.user);
-          }
-          // MUST await profile fetch before setting isLoading to false to prevent race condition
-          const profile = await fetchStaffProfile(existingSession.user.id);
-          if (!profile || profile.role !== 'owner' || !profile.isActive) {
-            console.warn('User is not an active owner. Ejecting session.');
-            await supabase.auth.signOut();
-            if (isMounted) {
-              setSession(null);
-              setUser(null);
-              setStaffProfile(null);
-            }
-          }
-        } else {
-          if (isMounted) {
-            setSession(null);
-            setUser(null);
-            setStaffProfile(null);
-          }
-        }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-        if (isMounted) {
-          setSession(null);
-          setUser(null);
-          setStaffProfile(null);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
     if (!isSupabaseConfigured) {
+      try {
+        const stored = localStorage.getItem(DEV_SESSION_STORAGE_KEY) || sessionStorage.getItem(DEV_SESSION_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.user && parsed?.profile?.role === 'owner' && parsed?.profile?.isActive) {
+            if (isMounted) {
+              setUser(parsed.user);
+              setStaffProfile(parsed.profile);
+            }
+            localStorage.setItem(DEV_SESSION_STORAGE_KEY, stored);
+          } else {
+            localStorage.removeItem(DEV_SESSION_STORAGE_KEY);
+            sessionStorage.removeItem(DEV_SESSION_STORAGE_KEY);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse dev session:', e);
+        localStorage.removeItem(DEV_SESSION_STORAGE_KEY);
+        sessionStorage.removeItem(DEV_SESSION_STORAGE_KEY);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
       return () => {
         isMounted = false;
       };
     }
 
-    // Real-time auth listener for sign-in, token refresh, sign-out
+    // Production Supabase Auth:
+    // Listen to onAuthStateChange (handles INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, SIGNED_OUT)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
         if (!isMounted) return;
@@ -143,27 +176,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (event === 'SIGNED_OUT' || !currentSession?.user) {
           setSession(null);
           setUser(null);
-          setStaffProfile(null);
-          setIsLoading(false);
+          saveStaffProfile(null);
+          if (isMounted) setIsLoading(false);
           return;
         }
 
         setSession(currentSession);
         setUser(currentSession.user);
 
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        // For any valid session event (INITIAL_SESSION on reload, SIGNED_IN, TOKEN_REFRESHED, etc.),
+        // fetch and verify staff permissions before lifting isLoading
+        try {
           const profile = await fetchStaffProfile(currentSession.user.id);
           if (!profile || profile.role !== 'owner' || !profile.isActive) {
+            console.warn('User is not an active owner. Ejecting session.');
             await supabase.auth.signOut();
             if (isMounted) {
               setSession(null);
               setUser(null);
-              setStaffProfile(null);
+              saveStaffProfile(null);
             }
           }
-        }
-        if (isMounted) {
-          setIsLoading(false);
+        } catch (err) {
+          console.error('Staff profile verification error:', err);
+        } finally {
+          if (isMounted) {
+            setIsLoading(false);
+          }
         }
       }
     );
@@ -200,10 +239,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       setUser(mockUser);
-      setStaffProfile(profile);
+      saveStaffProfile(profile);
       try {
-        localStorage.setItem('haven_kids_dev_owner_session', JSON.stringify({ user: mockUser, profile }));
-        sessionStorage.removeItem('haven_kids_dev_owner_session');
+        localStorage.setItem(DEV_SESSION_STORAGE_KEY, JSON.stringify({ user: mockUser, profile }));
+        sessionStorage.removeItem(DEV_SESSION_STORAGE_KEY);
       } catch (e) {
         console.error('Failed to store dev session in localStorage:', e);
       }
@@ -224,30 +263,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Kein Benutzerkonto gefunden.' };
       }
 
-      // Check staff membership
+      // Check staff membership and active owner status
       const { data: staffData, error: staffError } = await supabase
         .from('staff_members')
         .select('*')
         .eq('id', data.user.id)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (staffError || !staffData || staffData.role !== 'owner') {
         await supabase.auth.signOut();
+        saveStaffProfile(null);
         return {
           success: false,
           error: 'Zugriff verweigert: Nur der autorisierte Inhaber-Account (Owner) hat Zugriff auf diesen Administrationsbereich.',
         };
       }
 
-      setStaffProfile({
+      const profile: StaffProfile = {
         id: staffData.id,
         email: staffData.email,
         fullName: staffData.full_name || 'Inhaber (Owner)',
         role: 'owner',
         isActive: staffData.is_active,
         createdAt: staffData.created_at,
-      });
+      };
+
+      saveStaffProfile(profile);
+      setUser(data.user);
+      setSession(data.session);
 
       return { success: true };
     } catch (err: unknown) {
@@ -260,11 +304,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchRole = (newRole: StaffRole) => {
     if (staffProfile) {
-      setStaffProfile({
+      const updated: StaffProfile = {
         ...staffProfile,
         role: newRole,
         fullName: newRole === 'owner' ? 'Café Inhaberin (Owner)' : (newRole === 'admin' ? 'Betriebsleiter (Admin)' : 'Mitarbeiter (Staff)'),
-      });
+      };
+      saveStaffProfile(updated);
     }
   };
 
@@ -273,14 +318,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await supabase.auth.signOut();
     }
     try {
-      localStorage.removeItem('haven_kids_dev_owner_session');
-      sessionStorage.removeItem('haven_kids_dev_owner_session');
+      localStorage.removeItem(DEV_SESSION_STORAGE_KEY);
+      sessionStorage.removeItem(DEV_SESSION_STORAGE_KEY);
+      localStorage.removeItem(STAFF_PROFILE_STORAGE_KEY);
     } catch (e) {
       console.error('Error clearing local storage on signOut:', e);
     }
+    saveStaffProfile(null);
     setUser(null);
     setSession(null);
-    setStaffProfile(null);
   };
 
   return (
