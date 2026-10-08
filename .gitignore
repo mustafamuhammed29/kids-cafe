@@ -30,3 +30,4 @@ dist-ssr
 # Supabase temp & scripts screenshots
 supabase/.temp/
 scripts/*.png
+scripts/*.cjs

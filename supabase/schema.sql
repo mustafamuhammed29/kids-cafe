@@ -478,19 +478,10 @@ BEGIN
         );
     END IF;
 
-    -- Update booking status
+    -- Update booking status (trigger tr_bookings_sync_capacity will automatically restore slot capacity)
     UPDATE public.bookings
     SET status = 'cancelled', updated_at = timezone('utc'::text, now())
     WHERE id = v_booking.id;
-
-    -- Restore slot capacity
-    v_start_time := trim(split_part(v_booking.time_slot, '-', 1));
-
-    UPDATE public.time_slots
-    SET booked_count = GREATEST(0, booked_count - v_booking.num_children)
-    WHERE date = v_booking.date
-      AND start_time = v_start_time
-      AND service_id = v_booking.service_id;
 
     RETURN jsonb_build_object(
         'success', true,
@@ -502,6 +493,48 @@ $$;
 
 REVOKE ALL ON FUNCTION public.cancel_booking_by_token(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.cancel_booking_by_token(UUID) TO anon, authenticated, service_role;
+
+-- Automatic Slot Capacity Sync on Any Booking Status Change (Self-Service or Admin)
+CREATE OR REPLACE FUNCTION public.sync_booking_capacity_on_status_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_start_time VARCHAR(10);
+BEGIN
+    -- When booking is changed to 'cancelled' from a non-cancelled status:
+    IF (OLD.status IS DISTINCT FROM 'cancelled' AND NEW.status = 'cancelled') THEN
+        v_start_time := trim(split_part(OLD.time_slot, '-', 1));
+
+        UPDATE public.time_slots
+        SET booked_count = GREATEST(0, booked_count - OLD.num_children)
+        WHERE date = OLD.date
+          AND start_time = v_start_time
+          AND (service_id = OLD.service_id OR service_id = 'einzelbesuch');
+    END IF;
+
+    -- When a cancelled booking is restored/re-confirmed:
+    IF (OLD.status = 'cancelled' AND NEW.status IN ('confirmed', 'pending')) THEN
+        v_start_time := trim(split_part(NEW.time_slot, '-', 1));
+
+        UPDATE public.time_slots
+        SET booked_count = LEAST(max_capacity, booked_count + NEW.num_children)
+        WHERE date = NEW.date
+          AND start_time = v_start_time
+          AND (service_id = NEW.service_id OR service_id = 'einzelbesuch');
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tr_bookings_sync_capacity ON public.bookings;
+CREATE TRIGGER tr_bookings_sync_capacity
+    AFTER UPDATE OF status ON public.bookings
+    FOR EACH ROW
+    EXECUTE FUNCTION public.sync_booking_capacity_on_status_change();
 
 -- ==============================================================================
 -- 10. TRIGGER FUNCTIONS & AUTOMATIC TIMESTAMPS
@@ -636,9 +669,11 @@ CREATE POLICY "Admins can manage packages"
 -- C. Time Slots Policies
 -- ------------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Public can view active time slots" ON public.time_slots;
-CREATE POLICY "Public can view active time slots"
+DROP POLICY IF EXISTS "Public can view all time slots" ON public.time_slots;
+CREATE POLICY "Public can view all time slots"
     ON public.time_slots FOR SELECT
-    USING (is_active = true);
+    TO anon, authenticated
+    USING (true);
 
 DROP POLICY IF EXISTS "Admins can manage time slots" ON public.time_slots;
 CREATE POLICY "Admins can manage time slots"

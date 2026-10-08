@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { SERVICES, DEFAULT_TIME_SLOTS, BUSINESS_INFO } from '../../data/mockData';
 import type { ServiceItem, TimeSlot, BookingConfirmation, BookingFormData } from '../../types/booking';
-import { submitBooking } from '../../services/bookingService';
+import { submitBooking, getAvailableTimeSlots, type SlotAvailability } from '../../services/bookingService';
 import { MedicalDisclaimer } from '../common/MedicalDisclaimer';
 import { TurnstileWidget } from './TurnstileWidget';
 
@@ -46,6 +46,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   };
 
   const [selectedDate, setSelectedDate] = useState<string>(getTomorrowString());
+  const [slotsList, setSlotsList] = useState<SlotAvailability[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState<boolean>(false);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot>(DEFAULT_TIME_SLOTS[0]);
   const [childrenCount, setChildrenCount] = useState<number>(1);
   const [adultsCount, setAdultsCount] = useState<number>(1);
@@ -68,6 +70,38 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
   // Helper ID for accessibility
   const titleId = useId();
+
+  // Load available time slots dynamically from Supabase
+  useEffect(() => {
+    if (!isOpen) return;
+    let isMounted = true;
+    setIsLoadingSlots(true);
+
+    getAvailableTimeSlots(selectedDate, selectedService.slug || selectedService.id)
+      .then((data) => {
+        if (!isMounted) return;
+        setSlotsList(data);
+        setIsLoadingSlots(false);
+
+        // Keep current selected slot if still valid, otherwise pick first available
+        setSelectedSlot((prev) => {
+          const match = data.find((s) => s.startTime === prev?.startTime);
+          if (match && match.isActive && match.availableCount >= childrenCount) {
+            return match;
+          }
+          const available = data.find((s) => s.isActive && s.availableCount >= childrenCount);
+          return available || data[0] || prev;
+        });
+      })
+      .catch((err) => {
+        console.error('Fehler beim Laden der Zeitslots:', err);
+        if (isMounted) setIsLoadingSlots(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, selectedDate, selectedService.slug, selectedService.id, childrenCount]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -371,59 +405,148 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
               {/* Slot Cards */}
               <div className="space-y-3">
-                <label className="block text-sm font-bold text-slate-800 uppercase tracking-wide mb-1 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#0EA5E9]" />
-                  <span>Verfügbare Zeitslots (2 Stunden + Reinigung)</span>
+                <label className="block text-sm font-bold text-slate-800 uppercase tracking-wide mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-[#0EA5E9]" />
+                    <span>Verfügbare Zeitslots (2 Stunden + Reinigung)</span>
+                  </span>
+                  {isLoadingSlots && (
+                    <span className="text-xs text-sky-500 font-medium animate-pulse flex items-center gap-1">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Aktualisiere...
+                    </span>
+                  )}
                 </label>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {DEFAULT_TIME_SLOTS.map((slot) => {
-                    const isSelected = selectedSlot.id === slot.id;
-                    const freeSpots = slot.maxCapacity - slot.bookedCount;
-
-                    return (
+                {isLoadingSlots && slotsList.length === 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[1, 2, 3].map((i) => (
                       <div
-                        key={slot.id}
-                        onClick={() => setSelectedSlot(slot)}
-                        className={`p-4 sm:p-5 rounded-2xl border-2 cursor-pointer transition text-center min-h-[90px] flex flex-col justify-center ${
-                          isSelected
-                            ? 'border-[#0EA5E9] bg-[#F0F9FF] shadow-sm'
-                            : 'border-slate-200 hover:border-slate-300 bg-white'
-                        }`}
+                        key={i}
+                        className="p-5 rounded-2xl border border-slate-200 bg-slate-50/80 animate-pulse text-center min-h-[95px] flex flex-col justify-center items-center"
                       >
-                        <span className="font-extrabold text-base sm:text-lg text-[#0F172A] block">
-                          {slot.startTime} – {slot.endTime}
-                        </span>
-                        <span className="text-xs text-[#0EA5E9] font-bold block mt-1">
-                          {freeSpots} Plätze frei
-                        </span>
-                        <span className="text-xs text-slate-400 block mt-1 border-t border-slate-100 pt-1">
-                          danach 30m Lüftung
-                        </span>
+                        <div className="h-5 w-28 bg-slate-200 rounded mb-2" />
+                        <div className="h-4 w-20 bg-slate-200 rounded" />
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                ) : (slotsList.length > 0 ? slotsList : DEFAULT_TIME_SLOTS).length === 0 ? (
+                  <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center text-amber-800 text-xs font-semibold">
+                    Für dieses Datum sind derzeit keine buchbaren Zeitslots verfügbar.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {(slotsList.length > 0
+                      ? slotsList
+                      : DEFAULT_TIME_SLOTS.map((s) => ({
+                          ...s,
+                          availableCount: s.maxCapacity - s.bookedCount,
+                          isAvailable: s.maxCapacity > s.bookedCount,
+                          isActive: true,
+                        }))
+                    ).map((slot) => {
+                      const isSelected = selectedSlot?.startTime === slot.startTime;
+                      const isFull = slot.bookedCount >= slot.maxCapacity || slot.availableCount <= 0;
+                      const isDeactivated = slot.isActive === false;
+                      const isNotEnoughSeats = !isFull && !isDeactivated && slot.availableCount < childrenCount;
+                      const isBlocked = isFull || isDeactivated || isNotEnoughSeats;
+
+                      return (
+                        <button
+                          key={slot.id || slot.startTime}
+                          type="button"
+                          disabled={isBlocked}
+                          onClick={() => {
+                            if (!isBlocked) {
+                              setSelectedSlot(slot);
+                            }
+                          }}
+                          className={`p-4 sm:p-5 rounded-2xl border-2 transition text-center min-h-[100px] flex flex-col justify-center items-center relative w-full ${
+                            isBlocked
+                              ? 'border-slate-200 bg-slate-100/90 text-slate-400 cursor-not-allowed opacity-60 select-none shadow-none'
+                              : isSelected
+                              ? 'border-[#0EA5E9] bg-[#F0F9FF] shadow-sm ring-2 ring-[#0EA5E9]/20 cursor-pointer'
+                              : 'border-slate-200 hover:border-slate-300 bg-white cursor-pointer hover:shadow-xs'
+                          }`}
+                        >
+                          <span
+                            className={`font-extrabold text-base sm:text-lg block ${
+                              isBlocked ? 'text-slate-400 line-through decoration-slate-300' : 'text-[#0F172A]'
+                            }`}
+                          >
+                            {slot.startTime} – {slot.endTime} Uhr
+                          </span>
+
+                          <div className="mt-1">
+                            {isDeactivated ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-slate-200 text-slate-500">
+                                Gesperrt
+                              </span>
+                            ) : isFull ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-100 text-rose-600">
+                                Ausgebucht
+                              </span>
+                            ) : isNotEnoughSeats ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                                Nur {slot.availableCount} {slot.availableCount === 1 ? 'Platz' : 'Plätze'} frei
+                              </span>
+                            ) : (
+                              <span className="text-xs text-[#0EA5E9] font-bold block">
+                                {slot.availableCount} Plätze frei
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="text-[11px] text-slate-400 block mt-1 border-t border-slate-100 w-full pt-1">
+                            {isBlocked ? 'Nicht verfügbar' : 'danach 30m Lüftung'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md pt-3 pb-safe border-t border-slate-100 mt-6 flex items-center justify-between gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] px-4 -mx-4 sm:mx-0 sm:px-0 sm:shadow-none sm:border-t-0 sm:static">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="text-slate-600 hover:text-black font-semibold text-sm flex items-center gap-1.5 cursor-pointer min-h-[48px] px-3"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Zurück</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep(3)}
-                  className="flex-1 sm:flex-none sm:w-auto bg-[#0F172A] hover:bg-[#1E293B] text-white px-8 py-4 rounded-full font-bold text-base transition shadow-md flex items-center justify-center gap-2 cursor-pointer min-h-[50px]"
-                >
-                  <span>Weiter zu Personen & Extras</span>
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </div>
+              {(() => {
+                const currentMatch = (slotsList.length > 0 ? slotsList : []).find(
+                  (s) => s.startTime === selectedSlot?.startTime
+                );
+                const isSelectedBlocked =
+                  !selectedSlot ||
+                  (currentMatch &&
+                    (!currentMatch.isActive ||
+                      currentMatch.bookedCount >= currentMatch.maxCapacity ||
+                      currentMatch.availableCount < childrenCount));
+
+                return (
+                  <div>
+                    {isSelectedBlocked && (
+                      <p className="text-xs text-rose-500 font-bold mb-3 text-center">
+                        Der aktuell gewählte Zeitslot ist für {childrenCount} Kinder nicht verfügbar. Bitte wähle einen freien Slot.
+                      </p>
+                    )}
+                    <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md pt-3 pb-safe border-t border-slate-100 mt-6 flex items-center justify-between gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] px-4 -mx-4 sm:mx-0 sm:px-0 sm:shadow-none sm:border-t-0 sm:static">
+                      <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="text-slate-600 hover:text-black font-semibold text-sm flex items-center gap-1.5 cursor-pointer min-h-[48px] px-3"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        <span>Zurück</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSelectedBlocked}
+                        onClick={() => setStep(3)}
+                        className="flex-1 sm:flex-none sm:w-auto bg-[#0F172A] hover:bg-[#1E293B] disabled:opacity-40 disabled:cursor-not-allowed text-white px-8 py-4 rounded-full font-bold text-base transition shadow-md flex items-center justify-center gap-2 cursor-pointer min-h-[50px]"
+                      >
+                        <span>Weiter zu Personen & Extras</span>
+                        <ArrowRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

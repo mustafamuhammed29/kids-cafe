@@ -523,7 +523,7 @@ export async function fetchTimeSlotsForDate(date: string): Promise<AdminTimeSlot
 
 export async function updateTimeSlot(
   id: string,
-  updates: { isActive?: boolean; maxCapacity?: number }
+  updates: { isActive?: boolean; maxCapacity?: number; startTime?: string; endTime?: string }
 ): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured) {
     const slot = memorySlots.find((s) => s.id === id);
@@ -558,6 +558,8 @@ export async function updateTimeSlot(
     const payload: Record<string, any> = {};
     if (updates.isActive !== undefined) payload.is_active = updates.isActive;
     if (updates.maxCapacity !== undefined) payload.max_capacity = updates.maxCapacity;
+    if (updates.startTime !== undefined) payload.start_time = updates.startTime;
+    if (updates.endTime !== undefined) payload.end_time = updates.endTime;
 
     const { error } = await supabase
       .from('time_slots')
@@ -568,6 +570,189 @@ export async function updateTimeSlot(
     return { success: true };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : 'Fehler beim Aktualisieren des Zeitslots' };
+  }
+}
+
+export async function addTimeSlot(slot: {
+  date: string;
+  startTime: string;
+  endTime: string;
+  serviceId?: string;
+  maxCapacity: number;
+  isActive?: boolean;
+}): Promise<{ success: boolean; item?: AdminTimeSlot; error?: string }> {
+  const serviceId = slot.serviceId || 'einzelbesuch';
+  const isActive = slot.isActive !== undefined ? slot.isActive : true;
+
+  if (!isSupabaseConfigured) {
+    const newSlot: AdminTimeSlot = {
+      id: `slot-${Date.now()}`,
+      date: slot.date,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      serviceId,
+      maxCapacity: slot.maxCapacity,
+      bookedCount: 0,
+      isActive,
+    };
+    memorySlots.push(newSlot);
+    return { success: true, item: newSlot };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('time_slots')
+      .insert({
+        date: slot.date,
+        start_time: slot.startTime,
+        end_time: slot.endTime,
+        service_id: serviceId,
+        max_capacity: slot.maxCapacity,
+        booked_count: 0,
+        is_active: isActive,
+      })
+      .select()
+      .single();
+
+    if (error) return { success: false, error: error.message };
+
+    return {
+      success: true,
+      item: {
+        id: data.id,
+        date: data.date,
+        startTime: data.start_time,
+        endTime: data.end_time,
+        serviceId: data.service_id,
+        maxCapacity: data.max_capacity,
+        bookedCount: data.booked_count,
+        isActive: data.is_active,
+      },
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Fehler beim Erstellen des Zeitslots',
+    };
+  }
+}
+
+export async function deleteTimeSlot(id: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    memorySlots = memorySlots.filter((s) => s.id !== id);
+    return { success: true };
+  }
+
+  try {
+    const { data: slot, error: fetchErr } = await supabase
+      .from('time_slots')
+      .select('booked_count')
+      .eq('id', id)
+      .single();
+
+    if (!fetchErr && slot && slot.booked_count > 0) {
+      return {
+        success: false,
+        error: `Dieser Zeitslot kann nicht gelöscht werden, da bereits ${slot.booked_count} Kinder gebucht sind. Deaktiviere den Slot stattdessen.`,
+      };
+    }
+
+    const { error } = await supabase.from('time_slots').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Fehler beim Löschen des Zeitslots',
+    };
+  }
+}
+
+export async function initializeDefaultSlotsForDate(
+  date: string
+): Promise<{ success: boolean; slots?: AdminTimeSlot[]; error?: string }> {
+  const defaultSlotsDef = [
+    { start: '10:00', end: '12:00', cap: 20 },
+    { start: '12:30', end: '14:30', cap: 20 },
+    { start: '15:00', end: '17:00', cap: 20 },
+    { start: '17:30', end: '19:30', cap: 20 },
+  ];
+
+  if (!isSupabaseConfigured) {
+    const created: AdminTimeSlot[] = defaultSlotsDef.map((def, idx) => ({
+      id: `slot-gen-${date}-${idx}`,
+      date,
+      startTime: def.start,
+      endTime: def.end,
+      serviceId: 'einzelbesuch',
+      maxCapacity: def.cap,
+      bookedCount: 0,
+      isActive: true,
+    }));
+    memorySlots.push(...created);
+    return { success: true, slots: created };
+  }
+
+  try {
+    const rows = defaultSlotsDef.map((def) => ({
+      date,
+      start_time: def.start,
+      end_time: def.end,
+      service_id: 'einzelbesuch',
+      max_capacity: def.cap,
+      booked_count: 0,
+      is_active: true,
+    }));
+
+    const { data, error } = await supabase
+      .from('time_slots')
+      .upsert(rows, { onConflict: 'date,start_time,service_id' })
+      .select();
+
+    if (error) return { success: false, error: error.message };
+
+    const mapped: AdminTimeSlot[] = (data || []).map((r) => ({
+      id: r.id,
+      date: r.date,
+      startTime: r.start_time,
+      endTime: r.end_time,
+      serviceId: r.service_id,
+      maxCapacity: r.max_capacity,
+      bookedCount: r.booked_count,
+      isActive: r.is_active,
+    }));
+
+    return { success: true, slots: mapped };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Fehler beim Initialisieren der Standard-Slots',
+    };
+  }
+}
+
+export async function bulkToggleSlotsActive(
+  date: string,
+  isActive: boolean
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    memorySlots = memorySlots.map((s) => (s.date === date ? { ...s, isActive } : s));
+    return { success: true };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('time_slots')
+      .update({ is_active: isActive })
+      .eq('date', date);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Fehler beim Aktualisieren der Slots',
+    };
   }
 }
 

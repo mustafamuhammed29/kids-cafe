@@ -10,6 +10,7 @@ export interface SlotAvailability {
   bookedCount: number;
   availableCount: number;
   isAvailable: boolean;
+  isActive: boolean;
   cleaningBuffer: string;
 }
 
@@ -67,27 +68,26 @@ export async function getBookingPackages(): Promise<ServiceItem[]> {
 }
 
 /**
- * Fetch available time slots for a given date and service
+ * Fetch available time slots for a given date and service from Supabase
  */
 export async function getAvailableTimeSlots(
   date: string,
-  serviceId: string
+  serviceSlugOrId: string
 ): Promise<SlotAvailability[]> {
-  const maxCap = serviceId.includes('salt') ? 8 : 20;
+  const isSaltRoom = serviceSlugOrId ? serviceSlugOrId.toLowerCase().includes('salt') : false;
+  const defaultMaxCap = isSaltRoom ? 8 : 20;
 
   if (!isSupabaseConfigured) {
     return DEFAULT_TIME_SLOTS.map((slot) => {
-      const isWeekend = new Date(date).getDay() === 0 || new Date(date).getDay() === 6;
-      const booked = isWeekend ? Math.min(maxCap - 2, 8) : slot.bookedCount;
-      const avail = Math.max(0, maxCap - booked);
-
+      const avail = Math.max(0, defaultMaxCap - slot.bookedCount);
       return {
         id: slot.id,
         startTime: slot.startTime,
         endTime: slot.endTime,
-        maxCapacity: maxCap,
-        bookedCount: booked,
+        maxCapacity: defaultMaxCap,
+        bookedCount: slot.bookedCount,
         availableCount: avail,
+        isActive: true,
         isAvailable: avail > 0,
         cleaningBuffer: slot.cleaningBuffer,
       };
@@ -97,41 +97,66 @@ export async function getAvailableTimeSlots(
   try {
     const { data, error } = await supabase
       .from('time_slots')
-      .select('id, start_time, end_time, max_capacity, booked_count, is_active')
+      .select('id, start_time, end_time, service_id, max_capacity, booked_count, is_active')
       .eq('date', date)
-      .eq('service_id', serviceId)
-      .eq('is_active', true);
+      .order('start_time', { ascending: true });
 
     if (error) throw error;
 
-    const slotMap = new Map((data || []).map((s) => [s.start_time, s]));
+    if (data && data.length > 0) {
+      // Prioritize service-specific match or default
+      const slotMap = new Map<string, any>();
+      for (const row of data) {
+        if (!slotMap.has(row.start_time) || row.service_id === serviceSlugOrId) {
+          slotMap.set(row.start_time, row);
+        }
+      }
 
-    return DEFAULT_TIME_SLOTS.map((slot) => {
-      const record = slotMap.get(slot.startTime);
-      const booked = record ? record.booked_count : 0;
-      const cap = record ? record.max_capacity : maxCap;
-      const avail = Math.max(0, cap - booked);
+      return Array.from(slotMap.values())
+        .sort((a, b) => a.start_time.localeCompare(b.start_time))
+        .map((row) => {
+          const cap = Number(row.max_capacity) || defaultMaxCap;
+          const booked = Number(row.booked_count) || 0;
+          const isActive = row.is_active !== false;
+          const avail = Math.max(0, cap - booked);
 
-      return {
-        id: record?.id || slot.id,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        maxCapacity: cap,
-        bookedCount: booked,
-        availableCount: avail,
-        isAvailable: avail > 0,
-        cleaningBuffer: slot.cleaningBuffer,
-      };
-    });
-  } catch {
+          return {
+            id: row.id,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            maxCapacity: cap,
+            bookedCount: booked,
+            availableCount: avail,
+            isActive,
+            isAvailable: isActive && avail > 0,
+            cleaningBuffer: '30 Min Reinigung & Belüftung',
+          };
+        });
+    }
+
+    // Default slots for fresh dates
     return DEFAULT_TIME_SLOTS.map((slot) => ({
       id: slot.id,
       startTime: slot.startTime,
       endTime: slot.endTime,
-      maxCapacity: maxCap,
-      bookedCount: slot.bookedCount,
-      availableCount: Math.max(0, maxCap - slot.bookedCount),
+      maxCapacity: defaultMaxCap,
+      bookedCount: 0,
+      availableCount: defaultMaxCap,
+      isActive: true,
       isAvailable: true,
+      cleaningBuffer: slot.cleaningBuffer,
+    }));
+  } catch (err) {
+    console.error('Error fetching available time slots:', err);
+    return DEFAULT_TIME_SLOTS.map((slot) => ({
+      id: slot.id,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      maxCapacity: defaultMaxCap,
+      bookedCount: slot.bookedCount,
+      availableCount: Math.max(0, defaultMaxCap - slot.bookedCount),
+      isActive: true,
+      isAvailable: Math.max(0, defaultMaxCap - slot.bookedCount) > 0,
       cleaningBuffer: slot.cleaningBuffer,
     }));
   }
