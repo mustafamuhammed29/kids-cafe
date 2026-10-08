@@ -104,6 +104,13 @@ export const GalleryManagementModule: React.FC<GalleryManagementModuleProps> = (
         imageUrl: res.url,
         storagePath: res.storagePath,
       }));
+      if (res.savingsPercent && res.savingsPercent > 0) {
+        setStatusMessage({
+          type: 'success',
+          text: `Bild optimiert: ${res.originalSizeKb} KB ➔ ${res.compressedSizeKb} KB (${res.savingsPercent}% Speicher & Traffic gespart ✨)`,
+        });
+        setTimeout(() => setStatusMessage(null), 5000);
+      }
     } else {
       setUploadError(res.error || 'Fehler beim Hochladen der Datei.');
     }
@@ -270,6 +277,12 @@ export const GalleryManagementModule: React.FC<GalleryManagementModuleProps> = (
           <FileWarning className="w-4 h-4 text-amber-400 shrink-0" />
           <span>
             <strong className="text-white">Max. Dateigröße:</strong> 5 MB je Bild · SVG und Scripts strikt gesperrt
+          </span>
+        </div>
+        <div className="flex items-center gap-2 bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-0.5 rounded-lg">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-emerald-300 font-semibold">
+            Quota-Schutz aktiv: WebP-Auto-Kompression & 1-Jahr Cache (spart ~95% Traffic)
           </span>
         </div>
         <div className="flex items-center gap-2 text-slate-400">

@@ -139,6 +139,7 @@ export const GalleryPage: React.FC = () => {
                   src={img.url}
                   alt={img.title}
                   loading="lazy"
+                  decoding="async"
                   onError={(e) => {
                     const target = e.currentTarget;
                     if (!target.src.endsWith('/assets/spielbereich.jpg')) {
