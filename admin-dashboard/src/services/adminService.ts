@@ -1460,6 +1460,42 @@ export async function uploadGalleryImage(
     };
   }
 
+  // 2. Primary: Upload directly to Cloudinary CDN (Free 25GB Bandwidth & Storage)
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'mo5nsuan';
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'myproject';
+
+  if (cloudName && uploadPreset) {
+    try {
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+      formData.append('upload_preset', uploadPreset);
+      formData.append('folder', 'haven_kids_gallery');
+
+      const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (cloudRes.ok) {
+        const cloudData = await cloudRes.json();
+        return {
+          success: true,
+          url: cloudData.secure_url || cloudData.url,
+          storagePath: cloudData.public_id,
+          originalSizeKb,
+          compressedSizeKb,
+          savingsPercent,
+        };
+      } else {
+        const errJson = await cloudRes.json().catch(() => null);
+        console.warn('Cloudinary upload warning (falling back to Supabase):', errJson?.error?.message);
+      }
+    } catch (err) {
+      console.warn('Cloudinary upload network error (falling back to Supabase):', err);
+    }
+  }
+
+  // 3. Fallback: Upload to Supabase Storage with 1-Year Immutable Caching
   try {
     const { data, error } = await supabase.storage
       .from('gallery-media')
