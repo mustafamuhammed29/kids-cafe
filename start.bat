@@ -10,5 +10,11 @@ echo Starting Admin Dashboard (http://localhost:5174) ...
 echo.
 echo Press Ctrl+C anytime to stop.
 echo.
-npm run dev
+start "Public Website" cmd /c "npm run dev:public"
+start "Admin Dashboard" cmd /c "npm run dev:admin"
+
+echo.
+echo Both servers are starting in separate windows!
+echo Press any key to exit this launcher (the servers will keep running in their windows).
+echo.
 pause

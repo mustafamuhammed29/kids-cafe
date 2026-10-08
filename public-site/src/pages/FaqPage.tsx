@@ -1,25 +1,35 @@
 import React from 'react';
 import { FaqSection } from '../components/home/FaqSection';
+import { HelpCircle } from 'lucide-react';
+import { usePageSeo } from '../hooks/usePageSeo';
 
 export const FaqPage: React.FC = () => {
+  usePageSeo({
+    title: 'Häufige Fragen (FAQ) | Haven Kids Café Berlin',
+    description: 'Wichtige Antworten: Altersgrenzen (0-8 Jahre), Sockenpflicht, Salzraum-Ablauf, Stornierungsfristen und barrierefreier Zugang.',
+    canonicalPath: '/faq',
+  });
+
   return (
-    <div className="pt-20 sm:pt-24 animate-fadeIn pb-16">
-      {/* Header */}
-      <div className="bg-[#183D3D] text-white py-12 sm:py-16 px-4 text-center">
+    <div className="pt-16 sm:pt-20 md:pt-24 animate-fadeIn pb-24 md:pb-20 bg-[#FAF8F5] min-h-screen text-dark">
+      {/* Header - Confident, Generous & Welcoming */}
+      <section className="relative pt-6 pb-6 sm:py-12 px-4 text-center bg-white border-b border-slate-100">
         <div className="max-w-3xl mx-auto">
-          <span className="text-xs font-bold uppercase tracking-wider text-[#FFD3B6] bg-white/10 py-1 px-3.5 rounded-full inline-block mb-3">
-            Häufige Fragen & Antworten
-          </span>
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4 text-white">
-            Fragen & Antworten (FAQ)
+          <div className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-sky-50 border border-sky-100 text-primary font-bold text-xs sm:text-sm mb-3 shadow-xs">
+            <HelpCircle className="w-4 h-4" />
+            <span>Transparenz &amp; Antworten</span>
+          </div>
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 mb-3">
+            Häufige Fragen (FAQ)
           </h1>
-          <p className="text-sm sm:text-base text-gray-200 max-w-xl mx-auto font-light leading-relaxed">
-            Alles Wichtige zu deinem Besuch im Haven Kids Café: Sockenpflicht, Buchung, Altersgrenzen und unser Salzraum-Konzept.
+          <p className="text-base sm:text-xl text-slate-600 max-w-xl mx-auto leading-relaxed">
+            Schnelle Antworten zu Sockenpflicht, Altersgrenzen (0–8 J.), Buchung &amp; Salzraum.
           </p>
         </div>
-      </div>
+      </section>
 
-      <FaqSection />
+      {/* Main Interactive FAQ Section with Search directly above-the-fold */}
+      <FaqSection hideHeader={true} className="bg-[#FAF8F5]" />
     </div>
   );
 };

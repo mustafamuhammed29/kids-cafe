@@ -8,131 +8,183 @@ interface ServicesSectionProps {
 
 export const ServicesSection: React.FC<ServicesSectionProps> = ({ onOpenBooking }) => {
   return (
-    <section id="services" className="py-24 bg-white scroll-mt-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="services" className="py-10 sm:py-16 bg-slate-50/50 scroll-mt-24">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="text-xs font-bold uppercase tracking-wider text-[#5C8374] bg-[#93B1A6]/15 py-1 px-3 rounded-full inline-block mb-3">
-            Unser Raumkonzept
+        <div className="text-center max-w-xl mx-auto mb-10 sm:mb-14">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">
+            Raumkonzept im Detail
           </span>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-[#183D3D] mb-4">
-            Was Haven Kids besonders macht
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Liebevoll gestaltete Erlebnisräume
           </h2>
-          <div className="w-20 h-1 bg-[#5C8374] mx-auto rounded-full mb-6"></div>
-          <p className="text-gray-600 text-base sm:text-lg leading-relaxed">
-            Ein durchdachtes Wohlfühl-Konzept: Kindliche Entfaltung ohne Reizüberflutung kombiniert mit einer echten Auszeit für Eltern.
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mt-1">
+            Freies Entdecken ohne Reizüberflutung für die Kleinen – Wohlfühlatmosphäre und Kaffeegenuss für die Großen.
           </p>
         </div>
 
-        {/* 3 Core Pillars */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-10 mb-16">
-          {/* Service 1: Spielbereich */}
-          <div className="bg-[#FAFAFA] rounded-3xl p-8 border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group">
-            <div className="w-16 h-16 bg-[#FFD3B6]/40 rounded-2xl flex items-center justify-center mb-6 text-orange-600 group-hover:scale-110 transition-transform">
-              <Blocks className="w-8 h-8" />
-            </div>
-            <h3 className="text-2xl font-bold text-[#183D3D] mb-3">
-              Interaktiver Spielbereich
-            </h3>
-            <p className="text-gray-600 text-sm leading-relaxed mb-6">
-              100% bildschirmfreie Zone mit langlebigem Holzspielzeug, sicheren Klettermodulen und sensorischen Entdeckerstationen zur Förderung von Feinmotorik und Kreativität.
-            </p>
-            <ul className="space-y-2.5 text-xs sm:text-sm text-gray-700 mt-auto pt-4 border-t border-gray-200/60">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#5C8374] shrink-0" />
-                <span>Pädagogisch ausgewähltes Holzspielzeug</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#5C8374] shrink-0" />
-                <span>Geschützter Krabbelbereich für 0–2 Jahre</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#5C8374] shrink-0" />
-                <span>Regelmäßige Desinfektion & Reinigung</span>
-              </li>
-            </ul>
-          </div>
+        {/* 3 Core Spaces - Distinct, High-Quality Cards */}
+        <div className="space-y-4 sm:space-y-6 mb-10 sm:mb-14">
+          {/* Space 1: Spielbereich */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-md">
+                  <Blocks className="w-3.5 h-3.5" />
+                  0–8 Jahre
+                </span>
+                <span className="text-xs text-slate-500 font-medium">100% bildschirmfrei</span>
+              </div>
 
-          {/* Service 2: Salzraum */}
-          <div className="bg-[#E5F3FD]/40 rounded-3xl p-8 border border-sky-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group relative overflow-hidden">
-            <div className="w-16 h-16 bg-sky-100 rounded-2xl flex items-center justify-center mb-6 text-sky-600 group-hover:scale-110 transition-transform">
-              <Wind className="w-8 h-8" />
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-2xl font-bold text-[#183D3D]">
-                Wohltuender Salzraum
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+                Pädagogischer Holzspielbereich
               </h3>
-            </div>
-            <span className="inline-block text-[11px] font-bold text-sky-800 bg-sky-100 px-3 py-1 rounded-full w-fit mb-3">
-              Sanfte Halotherapie
-            </span>
-            <p className="text-gray-600 text-sm leading-relaxed mb-6">
-              Ein feines, trockenes Salzaerosol-Mikroklima in heller, kinderfreundlicher Umgebung. Kinder spielen spielerisch im Salz, während die ganze Familie tief durchatmet.
-            </p>
-            <ul className="space-y-2.5 text-xs sm:text-sm text-gray-700 mt-auto pt-4 border-t border-sky-200/60 mb-5">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-sky-600 shrink-0" />
-                <span>Trockensalz-Mikroklima (keine feuchte Vernebelung)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-sky-600 shrink-0" />
-                <span>Maximal 8 Kinder pro Sitzung (45 Minuten)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-sky-600 shrink-0" />
-                <span>Hell, einladend und mit hellem Spielzeug</span>
-              </li>
-            </ul>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                Nachhaltiges Holzspielzeug, sichere Klettermodule von namhaften Herstellern und sensorische Motorikstationen. Ein separater Krabbelbereich schützt Babys und Kleinkinder (0–2 Jahre).
+              </p>
 
-            {/* Medical disclaimer note */}
-            <MedicalDisclaimer className="mt-2 text-[11px]" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700 font-medium">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span>Sichere Motorik- &amp; Balanceelemente</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span>Separater Soft-Krabbelbereich</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span>Tägliche Desinfektion &amp; Reinigung</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span>Gedämpfte Akustik für sanfte Geräuschkulisse</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full md:w-auto shrink-0 flex md:flex-col justify-end">
+              <button
+                type="button"
+                onClick={onOpenBooking}
+                className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]"
+              >
+                <span>Spielzeit buchen</span>
+                <ArrowRight className="w-3.5 h-3.5 text-secondary" />
+              </button>
+            </div>
           </div>
 
-          {/* Service 3: Café */}
-          <div className="bg-[#FAFAFA] rounded-3xl p-8 border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group">
-            <div className="w-16 h-16 bg-[#93B1A6]/25 rounded-2xl flex items-center justify-center mb-6 text-[#5C8374] group-hover:scale-110 transition-transform">
-              <Coffee className="w-8 h-8" />
+          {/* Space 2: Salzraum */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-7 border-2 border-sky-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden bg-gradient-to-br from-white to-sky-50/40">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 text-[11px] font-black text-white bg-primary px-2.5 py-0.5 rounded-md">
+                  <Wind className="w-3.5 h-3.5" />
+                  Salzraum-Erlebnis
+                </span>
+                <span className="text-xs text-slate-500 font-medium">45 Min. • Max. 8 Kinder</span>
+                <span className="text-xs font-bold text-primary bg-sky-100/70 px-2 py-0.5 rounded-md">+5 € Upgrade</span>
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+                Sanfter Salzraum für Kinder &amp; Familien
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                Ein feines Trockensalz-Mikroklima in heller, kinderfreundlicher Umgebung. Während Kinder mit speziellem Sandspielzeug im Salz spielen, genießen Eltern eine ruhige Auszeit.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700 font-medium mb-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span>Feinstes Trockensalz-Mikroklima</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span>Begleitpersonen kostenfrei dabei</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span>Kleine Gruppe: max. 8 Kinder pro Slot</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                  <span>Helles, einladendes Design</span>
+                </div>
+              </div>
+
+              <MedicalDisclaimer className="text-[11px]" />
             </div>
-            <h3 className="text-2xl font-bold text-[#183D3D] mb-3">
-              Eltern-Café & Lounge
-            </h3>
-            <p className="text-gray-600 text-sm leading-relaxed mb-6">
-              Genieße Specialty Coffee, feine Bio-Tees und gesunde Snacks. Dank unseres offenen Raumkonzepts hast du dein spielendes Kind von jedem Tisch aus entspannt im Blick.
-            </p>
-            <ul className="space-y-2.5 text-xs sm:text-sm text-gray-700 mt-auto pt-4 border-t border-gray-200/60">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#5C8374] shrink-0" />
-                <span>Barista Specialty Coffee & Hafermilch-Optionen</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#5C8374] shrink-0" />
-                <span>Gesunde, zuckerarme Snacks & Kinder-Menüs</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#5C8374] shrink-0" />
-                <span>Kostenloses Highspeed-WLAN & Ladestationen</span>
-              </li>
-            </ul>
+
+            <div className="w-full md:w-auto shrink-0 flex md:flex-col justify-end">
+              <button
+                type="button"
+                onClick={onOpenBooking}
+                className="w-full md:w-auto bg-primary hover:bg-primary/95 text-white px-5 py-3 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer min-h-[44px]"
+              >
+                <span>Mit Salzraum buchen</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Space 3: Café & Lounge */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/70 px-2.5 py-0.5 rounded-md">
+                  <Coffee className="w-3.5 h-3.5" />
+                  Eltern-Lounge
+                </span>
+                <span className="text-xs text-slate-500 font-medium">Blickkontakt zum Spielbereich</span>
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+                Barista Café &amp; Entspannungs-Lounge
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                Genieße frisch zubereiteten Specialty Coffee, Hafermilch-Kaffeespezialitäten, feine Bio-Tees und gesunde Snacks. Dank unseres offenen Raumkonzepts hast du dein Kind jederzeit entspannt im Blick.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700 font-medium">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Barista Kaffeespezialitäten &amp; Bio-Tees</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Zuckerarme Kindersnacks &amp; Bio-Säfte</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Kostenloses Highspeed-WLAN</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Bequeme Sitzplätze mit Lademöglichkeiten</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Feature Highlight: Kindergeburtstage */}
-        <div className="bg-gradient-to-r from-[#183D3D] to-[#255050] rounded-3xl p-8 sm:p-12 text-white shadow-xl flex flex-col lg:flex-row items-center justify-between gap-8">
-          <div className="space-y-4 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFD3B6]/20 text-[#FFD3B6] text-xs font-bold">
-              <Cake className="w-4 h-4" />
-              <span>Unvergessliche Familienfeste</span>
+        {/* Feature Highlight: Kindergeburtstage (Calm, Premium Banner) */}
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 border-2 border-accent shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-2 text-left">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-accent/20 text-dark text-xs font-bold uppercase tracking-wider">
+              <Cake className="w-3.5 h-3.5" />
+              <span>Unvergessliche Feiern</span>
             </div>
-            <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Kindergeburtstag bei Haven Kids feiern
+            <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+              Kindergeburtstag stressfrei feiern
             </h3>
-            <p className="text-gray-200 text-sm sm:text-base leading-relaxed">
-              Feiere den großen Tag deines Kindes völlig stressfrei! Wir kümmern uns um den festlich dekorierten Geburtstagstisch, gesunde Bio-Snacks, Getränke und 2,5 Stunden puren Spielspaß für bis zu 8 Kinder und 4 Erwachsene.
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xl">
+              Festlich dekorierter Tisch, Bio-Snacks, Getränke und 2,5 Stunden Spielzeit für bis zu 8 Kinder &amp; 4 Erwachsene. Null Aufräumarbeit für Eltern!
             </p>
-            <div className="flex flex-wrap gap-4 text-xs text-gray-300">
+            <div className="flex flex-wrap gap-3 text-xs text-slate-500 font-semibold pt-1">
               <span>✓ Ab 250 € Paketpreis</span>
-              <span>✓ Keine Aufräumarbeit für Eltern</span>
-              <span>✓ Salzraum zubuchbar</span>
+              <span>✓ Salzraum optional</span>
+              <span>✓ Eigene Torte mitbringbar</span>
             </div>
           </div>
 
@@ -140,14 +192,17 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ onOpenBooking 
             <button
               type="button"
               onClick={onOpenBooking}
-              className="w-full sm:w-auto bg-[#FFD3B6] hover:bg-[#F8BE9A] text-[#183D3D] px-8 py-4 rounded-full font-extrabold text-base transition-all shadow-lg hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer min-h-[46px]"
             >
               <span>Geburtstag anfragen</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 text-secondary" />
             </button>
           </div>
         </div>
+
       </div>
     </section>
   );
 };
+
+export default ServicesSection;

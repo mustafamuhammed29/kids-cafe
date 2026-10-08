@@ -1,72 +1,129 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #93B1A6;
-  --color-primary-dark: #7A9B90;
-  --color-secondary: #5C8374;
-  --color-salt: #E5F3FD;
-  --color-salt-deep: #BAE0FD;
-  --color-accent: #FFD3B6;
-  --color-accent-hover: #F8BE9A;
-  --color-dark: #183D3D;
-  --color-dark-light: #255050;
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Outfit', sans-serif;
+  --color-primary: #0EA5E9;
+  --color-secondary: #38BDF8;
+  --color-salt: #F0F9FF;
+  --color-accent: #FB7185;
+  --color-sunshine: #FBBF24;
+  --color-dark: #0F172A;
+  --color-surface: #FAF8F5;
+  --color-milk: #FAF8F5;
+  --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 20px 40px -10px rgba(14, 165, 233, 0.25);
 }
 
 @layer base {
   body {
     font-family: var(--font-sans);
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    background-color: #FAF8F5;
+    color: #0F172A;
   }
 }
 
-/* Glassmorphism utilities */
-.glass-nav {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+/* Hide scrollbar for horizontal swipe areas */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-.glass-bottom-nav {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+.hide-scrollbar {
+  -ms-overflow-style: none;
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+@supports (scrollbar-width: none) {
+  .hide-scrollbar {
+    scrollbar-width: none;
+  }
 }
 
-.glass-dark {
-  background: rgba(24, 61, 61, 0.9);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-/* Hero background with local asset and fallback */
-.hero-gradient {
-  background: linear-gradient(135deg, rgba(24, 61, 61, 0.72) 0%, rgba(24, 61, 61, 0.82) 100%),
-              url('/assets/hero-bg.jpg');
-  background-size: cover;
-  background-position: center;
-}
-
-.salt-texture {
-  background-color: #E5F3FD;
-  background-image: radial-gradient(#93b1a6 0.75px, transparent 0.75px), radial-gradient(#93b1a6 0.75px, #e5f3fd 0.75px);
-  background-size: 30px 30px;
-  background-position: 0 0, 15px 15px;
-}
-
-/* Safe area for iOS home indicator bar */
+/* Safe area inset support */
 .pb-safe {
-  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 16px));
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
 }
 
-/* Mobile Spacing & Typography Optimization */
-@media (max-width: 640px) {
-  .hero-section {
-    min-height: 80vh !important;
+
+/* Glassmorphism */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.glass-input {
+  background: rgba(248, 250, 252, 0.8);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
   }
+
+  50% {
+    transform: translateY(-12px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float-bubble {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: translateY(-20px) scale(1.05) rotate(5deg);
+    opacity: 1;
+  }
+}
+
+.animate-bubble {
+  animation: float-bubble 5s ease-in-out infinite;
+}
+
+/* Reveal Animations */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: all 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.reveal.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Gradient Text */
+.text-gradient {
+  background: linear-gradient(135deg, #0EA5E9 0%, #FB7185 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0.85;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  opacity: 1;
+  animation: fadeIn 0.2s ease-out forwards;
 }

@@ -10,10 +10,19 @@ const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET') || '';
 const ALLOWED_ORIGINS = [
   'http://localhost:4173',
   'http://localhost:4174',
-  'https://havenkids.de',
-  'https://www.havenkids.de',
-  'https://admin.havenkids.de',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://havenkidscafe.de',
+  'https://www.havenkidscafe.de',
+  'https://admin.havenkidscafe.de',
 ];
+
+function isOriginAllowed(origin: string): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (origin.endsWith('.vercel.app')) return true;
+  return false;
+}
 
 interface BookingPayload {
   record: {
@@ -33,12 +42,13 @@ interface BookingPayload {
 
 serve(async (req) => {
   const origin = req.headers.get('Origin') || '';
-  const isAllowedOrigin = ALLOWED_ORIGINS.includes(origin);
+  const isAllowed = isOriginAllowed(origin);
 
   const corsHeaders: Record<string, string> = {
-    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://havenkidscafe.de',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+    'Vary': 'Origin',
   };
 
   if (req.method === 'OPTIONS') {
@@ -75,8 +85,8 @@ serve(async (req) => {
     }
 
     const cancelUrl = b.cancellation_token
-      ? `https://havenkids.de/stornierung?token=${b.cancellation_token}`
-      : 'https://havenkids.de/contact';
+      ? `https://havenkidscafe.de/stornierung?token=${b.cancellation_token}`
+      : 'https://havenkidscafe.de/contact';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -142,7 +152,7 @@ serve(async (req) => {
         <ul style="margin: 8px 0 0; padding-left: 20px; line-height: 1.5;">
           <li>Bitte bringe rutschfeste Stoppersocken für alle mit.</li>
           <li>Bitte erscheine ca. 10 Minuten vor Slot-Beginn.</li>
-          <li>Kostenlose Stornierung bis 24 Stunden vor dem Termin möglich.</li>
+          <li>Kostenlose Online-Stornierung bis zu 2 Stunden vor dem Termin möglich.</li>
         </ul>
       </div>
 
@@ -158,7 +168,7 @@ serve(async (req) => {
       </div>
     </div>
     <div class="footer">
-      © 2026 Haven Kids Café · Friedrichstraße 123, 10117 Berlin · hello@havenkids.de
+      © 2026 Haven Kids Café · Friedrichstraße 123, 10117 Berlin · hallo@havenkidscafe.de
     </div>
   </div>
 </body>
@@ -172,7 +182,7 @@ serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Haven Kids Café <buchung@havenkids.de>',
+        from: 'Haven Kids Café <buchung@havenkidscafe.de>',
         to: [b.customer_email],
         subject: `Deine Buchungsbestätigung #${b.reference_code} — Haven Kids Café`,
         html: htmlContent,

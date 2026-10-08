@@ -1,0 +1,6 @@
+# Haven Kids Café robots.txt
+# Public pages are crawlable so search engines can read metadata & noindex directives.
+User-agent: *
+Allow: /
+
+Sitemap: https://havenkidscafe.de/sitemap.xml

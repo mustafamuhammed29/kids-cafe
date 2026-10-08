@@ -8,14 +8,14 @@ The system is strictly divided into two autonomous applications to guarantee cus
 
 ```text
 Kids/
-├── public-site/                 # Customer-Facing Web App (https://havenkids.de)
+├── public-site/                 # Customer-Facing Web App (https://havenkidscafe.de)
 │   ├── src/                     # Customer routes: /, /services, /pricing, /gallery, /faq, /contact
 │   ├── public/                  # Assets, brand logo, favicon, photos (<180KB)
 │   ├── package.json
 │   ├── vite.config.ts           # Configured for Port 5173 (Dev) & 4173 (Preview)
 │   └── .env.example
 │
-├── admin-dashboard/             # Staff & Admin Workspace (https://admin.havenkids.de)
+├── admin-dashboard/             # Staff & Admin Workspace (https://admin.havenkidscafe.de)
 │   ├── src/                     # Supabase Auth, protected dashboard, bookings management
 │   ├── public/                  # Favicon
 │   ├── package.json
@@ -53,8 +53,8 @@ Kids/
 
 | Application | Production Target | Local Dev Port | Local Preview Port |
 |---|---|---|---|
-| **Public Customer Site** | `https://havenkids.de/` | `http://localhost:5173/` | `http://localhost:4173/` |
-| **Admin Staff Portal** | `https://admin.havenkids.de/` | `http://localhost:5174/` | `http://localhost:4174/` |
+| **Public Customer Site** | `https://havenkidscafe.de/` | `http://localhost:5173/` | `http://localhost:4173/` |
+| **Admin Staff Portal** | `https://admin.havenkidscafe.de/` | `http://localhost:5174/` | `http://localhost:4174/` |
 
 ### Available Root Commands
 

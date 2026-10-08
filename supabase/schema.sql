@@ -71,12 +71,30 @@ AS $$
     );
 $$;
 
+-- Helper function: Is current user authorized owner?
+CREATE OR REPLACE FUNCTION public.is_owner(p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+STABLE
+AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.staff_members
+        WHERE id = p_user_id AND is_active = true AND role = 'owner'
+    );
+$$;
+
 -- Revoke execute from PUBLIC and grant strictly to authenticated staff and service_role
 REVOKE ALL ON FUNCTION public.is_staff(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_staff(UUID) TO authenticated, service_role;
 
 REVOKE ALL ON FUNCTION public.is_admin_or_owner(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_admin_or_owner(UUID) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.is_owner(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_owner(UUID) TO authenticated, service_role;
 
 -- ==============================================================================
 -- 4. PACKAGES TABLE (Public Catalog)
@@ -182,7 +200,7 @@ CREATE OR REPLACE FUNCTION public.create_booking_atomic(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
     v_slot_record RECORD;
@@ -212,6 +230,17 @@ BEGIN
         RETURN jsonb_build_object(
             'success', false,
             'error_message', 'Sonntags hat das Haven Kids Café geschlossen.'
+        );
+    END IF;
+
+    -- Blocked Dates Check (Admin closure)
+    IF EXISTS (
+        SELECT 1 FROM public.blocked_dates
+        WHERE date = p_date
+    ) THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error_message', 'An diesem Datum hat das Haven Kids Café geschlossen (Ruhetag oder Exklusivveranstaltung).'
         );
     END IF;
 
@@ -362,7 +391,7 @@ BEGIN
     WHERE id = v_slot_record.id;
 
     -- 7. Safe Reference Code & Secret Token Generation Server-Side
-    v_ref_code := 'HKC-' || to_char(p_date, 'YYYYMMDD') || '-' || upper(substring(encode(gen_random_bytes(4), 'hex') from 1 for 4));
+    v_ref_code := 'HKC-' || to_char(p_date, 'YYYYMMDD') || '-' || upper(substring(replace(gen_random_uuid()::text, '-', '') from 1 for 4));
     v_cancellation_token := gen_random_uuid();
 
     -- 8. Insert Confirmed Booking
@@ -575,11 +604,13 @@ ALTER TABLE public.rate_limit_events ENABLE ROW LEVEL SECURITY;
 -- ------------------------------------------------------------------------------
 -- A. Staff Members Policies
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Staff can view staff profiles" ON public.staff_members;
 CREATE POLICY "Staff can view staff profiles"
     ON public.staff_members FOR SELECT
     TO authenticated
     USING (public.is_staff(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can manage staff members" ON public.staff_members;
 CREATE POLICY "Admins can manage staff members"
     ON public.staff_members FOR ALL
     TO authenticated
@@ -589,10 +620,12 @@ CREATE POLICY "Admins can manage staff members"
 -- ------------------------------------------------------------------------------
 -- B. Packages Policies
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Public can view active packages" ON public.packages;
 CREATE POLICY "Public can view active packages"
     ON public.packages FOR SELECT
     USING (is_visible = true);
 
+DROP POLICY IF EXISTS "Admins can manage packages" ON public.packages;
 CREATE POLICY "Admins can manage packages"
     ON public.packages FOR ALL
     TO authenticated
@@ -602,10 +635,12 @@ CREATE POLICY "Admins can manage packages"
 -- ------------------------------------------------------------------------------
 -- C. Time Slots Policies
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Public can view active time slots" ON public.time_slots;
 CREATE POLICY "Public can view active time slots"
     ON public.time_slots FOR SELECT
     USING (is_active = true);
 
+DROP POLICY IF EXISTS "Admins can manage time slots" ON public.time_slots;
 CREATE POLICY "Admins can manage time slots"
     ON public.time_slots FOR ALL
     TO authenticated
@@ -615,22 +650,26 @@ CREATE POLICY "Admins can manage time slots"
 -- ------------------------------------------------------------------------------
 -- D. Bookings Policies (PRIVATE — NO PUBLIC DIRECT ACCESS)
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Staff can view bookings" ON public.bookings;
 CREATE POLICY "Staff can view bookings"
     ON public.bookings FOR SELECT
     TO authenticated
     USING (public.is_staff(auth.uid()));
 
+DROP POLICY IF EXISTS "Staff can update bookings" ON public.bookings;
 CREATE POLICY "Staff can update bookings"
     ON public.bookings FOR UPDATE
     TO authenticated
     USING (public.is_staff(auth.uid()))
     WITH CHECK (public.is_staff(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can delete bookings" ON public.bookings;
 CREATE POLICY "Admins can delete bookings"
     ON public.bookings FOR DELETE
     TO authenticated
     USING (public.is_admin_or_owner(auth.uid()));
 
+DROP POLICY IF EXISTS "Staff can insert bookings directly" ON public.bookings;
 CREATE POLICY "Staff can insert bookings directly"
     ON public.bookings FOR INSERT
     TO authenticated
@@ -639,25 +678,363 @@ CREATE POLICY "Staff can insert bookings directly"
 -- ------------------------------------------------------------------------------
 -- E. Audit Logs Policies (INTERNAL ONLY — ZERO PUBLIC ACCESS)
 -- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Staff can view audit logs" ON public.audit_logs;
 CREATE POLICY "Staff can view audit logs"
     ON public.audit_logs FOR SELECT
     TO authenticated
     USING (public.is_staff(auth.uid()));
 
+DROP POLICY IF EXISTS "Staff can write audit logs" ON public.audit_logs;
 CREATE POLICY "Staff can write audit logs"
     ON public.audit_logs FOR INSERT
     TO authenticated
     WITH CHECK (public.is_staff(auth.uid()));
 
 -- ==============================================================================
--- 13. REALTIME SUBSCRIPTION REGISTRATION
+-- 13. BLOCKED DATES TABLE (Day Closures & Holiday Blocks)
 -- ==============================================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.time_slots;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
+CREATE TABLE IF NOT EXISTS public.blocked_dates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    date DATE NOT NULL UNIQUE,
+    reason VARCHAR(255),
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_blocked_dates_date ON public.blocked_dates(date);
 
 -- ==============================================================================
--- 14. INITIAL SEED DATA (All 6 Packages)
+-- 14. SITE ANNOUNCEMENTS TABLE (Banner Alerts & Operational Notices)
 -- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.site_announcements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    message TEXT NOT NULL,
+    type VARCHAR(30) NOT NULL DEFAULT 'info' CHECK (type IN ('info', 'warning', 'success', 'urgent')),
+    link_url VARCHAR(255),
+    link_text VARCHAR(100),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    starts_at TIMESTAMPTZ,
+    ends_at TIMESTAMPTZ,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_site_announcements_active ON public.site_announcements(is_active, starts_at, ends_at);
+
+DROP TRIGGER IF EXISTS tr_site_announcements_updated_at ON public.site_announcements;
+CREATE TRIGGER tr_site_announcements_updated_at
+    BEFORE UPDATE ON public.site_announcements
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- ==============================================================================
+-- 15. FAQS TABLE (Dynamic FAQ Management)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.faqs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category VARCHAR(50) NOT NULL DEFAULT 'Allgemein',
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    display_order INT NOT NULL DEFAULT 0,
+    is_published BOOLEAN NOT NULL DEFAULT true,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_faqs_published_order ON public.faqs(is_published, display_order);
+
+DROP TRIGGER IF EXISTS tr_faqs_updated_at ON public.faqs;
+CREATE TRIGGER tr_faqs_updated_at
+    BEFORE UPDATE ON public.faqs
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- ==============================================================================
+-- 16. GALLERY ITEMS TABLE (Dynamic Photo Showcase)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.gallery_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(150) NOT NULL,
+    category VARCHAR(50) NOT NULL DEFAULT 'Spielbereich',
+    description TEXT,
+    image_url TEXT NOT NULL,
+    storage_path VARCHAR(255),
+    display_order INT NOT NULL DEFAULT 0,
+    is_visible BOOLEAN NOT NULL DEFAULT true,
+    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_gallery_items_visible_order ON public.gallery_items(is_visible, display_order);
+
+DROP TRIGGER IF EXISTS tr_gallery_items_updated_at ON public.gallery_items;
+CREATE TRIGGER tr_gallery_items_updated_at
+    BEFORE UPDATE ON public.gallery_items
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- ==============================================================================
+-- 17. BUSINESS SETTINGS TABLE (Owner-Controlled Key-Value Store)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.business_settings (
+    key VARCHAR(50) PRIMARY KEY,
+    value JSONB NOT NULL,
+    category VARCHAR(50) NOT NULL DEFAULT 'general',
+    description TEXT,
+    is_public BOOLEAN NOT NULL DEFAULT true,
+    updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_business_settings_public ON public.business_settings(is_public);
+
+DROP TRIGGER IF EXISTS tr_business_settings_updated_at ON public.business_settings;
+CREATE TRIGGER tr_business_settings_updated_at
+    BEFORE UPDATE ON public.business_settings
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- ==============================================================================
+-- 18. EVENT INQUIRIES TABLE (Inbound Contact & Party Requests Inbox)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.event_inquiries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(150) NOT NULL,
+    phone VARCHAR(50),
+    event_type VARCHAR(50) NOT NULL DEFAULT 'general' CHECK (event_type IN ('general', 'birthday', 'group_party', 'group_event', 'corporate')),
+    target_date DATE,
+    children_count INT,
+    adults_count INT,
+    message TEXT NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'reserved', 'rejected', 'archived')),
+    admin_notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_inquiries_status_created ON public.event_inquiries(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_event_inquiries_email ON public.event_inquiries(email);
+
+DROP TRIGGER IF EXISTS tr_event_inquiries_updated_at ON public.event_inquiries;
+CREATE TRIGGER tr_event_inquiries_updated_at
+    BEFORE UPDATE ON public.event_inquiries
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- ==============================================================================
+-- 19. EXTENDED ROW LEVEL SECURITY (RLS) POLICIES
+-- ==============================================================================
+ALTER TABLE public.blocked_dates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.site_announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.faqs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gallery_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.business_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_inquiries ENABLE ROW LEVEL SECURITY;
+
+-- Blocked Dates Policies
+DROP POLICY IF EXISTS "Public can view blocked dates" ON public.blocked_dates;
+CREATE POLICY "Public can view blocked dates"
+    ON public.blocked_dates FOR SELECT
+    USING (true);
+
+DROP POLICY IF EXISTS "Admins can manage blocked dates" ON public.blocked_dates;
+CREATE POLICY "Admins can manage blocked dates"
+    ON public.blocked_dates FOR ALL
+    TO authenticated
+    USING (public.is_admin_or_owner(auth.uid()))
+    WITH CHECK (public.is_admin_or_owner(auth.uid()));
+
+-- Site Announcements Policies
+DROP POLICY IF EXISTS "Public can view active announcements" ON public.site_announcements;
+CREATE POLICY "Public can view active announcements"
+    ON public.site_announcements FOR SELECT
+    USING (
+        is_active = true
+        AND (starts_at IS NULL OR starts_at <= timezone('utc'::text, now()))
+        AND (ends_at IS NULL OR ends_at >= timezone('utc'::text, now()))
+    );
+
+DROP POLICY IF EXISTS "Staff can view all announcements" ON public.site_announcements;
+CREATE POLICY "Staff can view all announcements"
+    ON public.site_announcements FOR SELECT
+    TO authenticated
+    USING (public.is_staff(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins can manage announcements" ON public.site_announcements;
+CREATE POLICY "Admins can manage announcements"
+    ON public.site_announcements FOR ALL
+    TO authenticated
+    USING (public.is_admin_or_owner(auth.uid()))
+    WITH CHECK (public.is_admin_or_owner(auth.uid()));
+
+-- FAQs Policies
+DROP POLICY IF EXISTS "Public can view published FAQs" ON public.faqs;
+CREATE POLICY "Public can view published FAQs"
+    ON public.faqs FOR SELECT
+    USING (is_published = true);
+
+DROP POLICY IF EXISTS "Staff can view all FAQs" ON public.faqs;
+CREATE POLICY "Staff can view all FAQs"
+    ON public.faqs FOR SELECT
+    TO authenticated
+    USING (public.is_staff(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins can manage FAQs" ON public.faqs;
+CREATE POLICY "Admins can manage FAQs"
+    ON public.faqs FOR ALL
+    TO authenticated
+    USING (public.is_admin_or_owner(auth.uid()))
+    WITH CHECK (public.is_admin_or_owner(auth.uid()));
+
+-- Gallery Items Policies
+DROP POLICY IF EXISTS "Public can view visible gallery items" ON public.gallery_items;
+CREATE POLICY "Public can view visible gallery items"
+    ON public.gallery_items FOR SELECT
+    USING (is_visible = true);
+
+DROP POLICY IF EXISTS "Staff can view all gallery items" ON public.gallery_items;
+CREATE POLICY "Staff can view all gallery items"
+    ON public.gallery_items FOR SELECT
+    TO authenticated
+    USING (public.is_staff(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins can manage gallery items" ON public.gallery_items;
+CREATE POLICY "Admins can manage gallery items"
+    ON public.gallery_items FOR ALL
+    TO authenticated
+    USING (public.is_admin_or_owner(auth.uid()))
+    WITH CHECK (public.is_admin_or_owner(auth.uid()));
+
+-- Business Settings Policies (OWNER-EXCLUSIVE MUTATION)
+DROP POLICY IF EXISTS "Public can view public business settings" ON public.business_settings;
+CREATE POLICY "Public can view public business settings"
+    ON public.business_settings FOR SELECT
+    USING (is_public = true);
+
+DROP POLICY IF EXISTS "Staff can view all business settings" ON public.business_settings;
+CREATE POLICY "Staff can view all business settings"
+    ON public.business_settings FOR SELECT
+    TO authenticated
+    USING (public.is_staff(auth.uid()));
+
+DROP POLICY IF EXISTS "Only owners can manage business settings" ON public.business_settings;
+CREATE POLICY "Only owners can manage business settings"
+    ON public.business_settings FOR ALL
+    TO authenticated
+    USING (public.is_owner(auth.uid()))
+    WITH CHECK (public.is_owner(auth.uid()));
+
+-- Event Inquiries Policies (PRIVATE INBOX)
+DROP POLICY IF EXISTS "Public can submit event inquiries" ON public.event_inquiries;
+CREATE POLICY "Public can submit event inquiries"
+    ON public.event_inquiries FOR INSERT
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Staff can view event inquiries" ON public.event_inquiries;
+CREATE POLICY "Staff can view event inquiries"
+    ON public.event_inquiries FOR SELECT
+    TO authenticated
+    USING (public.is_staff(auth.uid()));
+
+DROP POLICY IF EXISTS "Staff can update event inquiries" ON public.event_inquiries;
+CREATE POLICY "Staff can update event inquiries"
+    ON public.event_inquiries FOR UPDATE
+    TO authenticated
+    USING (public.is_staff(auth.uid()))
+    WITH CHECK (public.is_staff(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins can delete event inquiries" ON public.event_inquiries;
+CREATE POLICY "Admins can delete event inquiries"
+    ON public.event_inquiries FOR DELETE
+    TO authenticated
+    USING (public.is_admin_or_owner(auth.uid()));
+-- ------------------------------------------------------------------------------
+-- Storage Policies for gallery-media Bucket
+-- ------------------------------------------------------------------------------
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'gallery-media',
+    'gallery-media',
+    true,
+    5242880,
+    ARRAY['image/jpeg', 'image/png', 'image/webp']::text[]
+)
+ON CONFLICT (id) DO UPDATE SET
+    public = true,
+    file_size_limit = 5242880,
+    allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp']::text[];
+
+-- Public Read on storage objects
+DROP POLICY IF EXISTS "Public can view gallery media objects" ON storage.objects;
+CREATE POLICY "Public can view gallery media objects"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'gallery-media');
+
+-- Upload: Admins and Owners only, restricted to safe image formats
+DROP POLICY IF EXISTS "Admins and owners can upload gallery media" ON storage.objects;
+CREATE POLICY "Admins and owners can upload gallery media"
+    ON storage.objects FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        bucket_id = 'gallery-media'
+        AND public.is_admin_or_owner(auth.uid())
+        AND (storage.extension(name) IN ('jpg', 'jpeg', 'png', 'webp'))
+    );
+
+-- Update: Admins and Owners only
+DROP POLICY IF EXISTS "Admins and owners can update gallery media" ON storage.objects;
+CREATE POLICY "Admins and owners can update gallery media"
+    ON storage.objects FOR UPDATE
+    TO authenticated
+    USING (
+        bucket_id = 'gallery-media'
+        AND public.is_admin_or_owner(auth.uid())
+    )
+    WITH CHECK (
+        bucket_id = 'gallery-media'
+        AND public.is_admin_or_owner(auth.uid())
+    );
+
+-- Delete: Admins and Owners only
+DROP POLICY IF EXISTS "Admins and owners can delete gallery media" ON storage.objects;
+CREATE POLICY "Admins and owners can delete gallery media"
+    ON storage.objects FOR DELETE
+    TO authenticated
+    USING (
+        bucket_id = 'gallery-media'
+        AND public.is_admin_or_owner(auth.uid())
+    );
+
+-- ==============================================================================
+-- 20. REALTIME SUBSCRIPTION REGISTRATION
+-- ==============================================================================
+DO $$
+BEGIN
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.time_slots;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.bookings;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.event_inquiries;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.site_announcements;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.blocked_dates;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+END $$;
+
+-- ==============================================================================
+-- 21. INITIAL SEED DATA
+-- ==============================================================================
+-- Packages Seed
 INSERT INTO public.packages (slug, name, subtitle, description, features, price_type, base_price, currency, cta_text, cta_action, is_visible, category, display_order)
 VALUES
 (
@@ -751,3 +1128,78 @@ VALUES
     6
 )
 ON CONFLICT (slug) DO NOTHING;
+
+-- Business Settings Seed
+INSERT INTO public.business_settings (key, value, category, description, is_public)
+VALUES
+    ('name', '"Haven Kids Café"'::jsonb, 'identity', 'Offizieller Name des Cafés', true),
+    ('tagline', '"Kreativer Spielraum & modernes Familiencafé"'::jsonb, 'identity', 'Untertitel / Slogan', true),
+    ('address', '"Musterstraße 123, 10115 Berlin"'::jsonb, 'contact', 'Vollständige Geschäftsadresse', true),
+    ('phone', '"+49 30 12345678"'::jsonb, 'contact', 'Telefonnummer für Kundenanfragen', true),
+    ('email', '"hallo@havenkidscafe.de"'::jsonb, 'contact', 'Offizielle E-Mail-Adresse', true),
+    ('whatsapp_url', '"https://wa.me/493012345678"'::jsonb, 'contact', 'Direktlink zum WhatsApp-Chat', true),
+    ('opening_hours', '[
+        {"days": "Montag – Donnerstag", "time": "10:00 – 18:00 Uhr"},
+        {"days": "Freitag – Samstag", "time": "09:00 – 19:00 Uhr"},
+        {"days": "Sonntag", "time": "Geschlossen (Ruhetag & Exklusiv-Events)"}
+    ]'::jsonb, 'operating_hours', 'Reguläre Öffnungszeiten', true)
+ON CONFLICT (key) DO NOTHING;
+
+-- FAQs Seed
+INSERT INTO public.faqs (category, question, answer, display_order, is_published)
+VALUES
+    (
+        'Besuch & Regeln',
+        'Gilt im Haven Kids Café eine Sockenpflicht?',
+        'Ja, aus hygienischen und Sicherheitsgründen gilt im gesamten Spielbereich sowie im Salzraum eine strikte Sockenpflicht für alle Kinder und Erwachsenen. Wir empfehlen rutschfeste Stoppersocken für die Kinder.',
+        1,
+        true
+    ),
+    (
+        'Besuch & Regeln',
+        'Für welches Alter ist das Café geeignet?',
+        'Unser pädagogisches Konzept und unsere Spielbereiche sind optimal auf Babys, Kleinkinder und Kinder im Alter von 0 bis 8 Jahren ausgerichtet.',
+        2,
+        true
+    ),
+    (
+        'Preise & Buchung',
+        'Müssen Erwachsene Eintritt bezahlen?',
+        'Nein! Pro gebuchtem Kind haben bis zu zwei erwachsene Begleitpersonen freien Eintritt in unser Café und zu den Sitzbereichen.',
+        3,
+        true
+    ),
+    (
+        'Preise & Buchung',
+        'Wie lauten die Stornierungsbedingungen?',
+        'Einzelbesuche können bis zu 2 Stunden vor Beginn kostenfrei über den Link in der Bestätigungs-E-Mail storniert werden. Für Kindergeburtstage gilt wegen der exklusiven Vorbereitung eine Frist von mindestens 48 Stunden vor Beginn.',
+        4,
+        true
+    ),
+    (
+        'Salzraum',
+        'Was ist der Salzraum und wie buche ich ihn?',
+        'Unser Salzraum ist eine entspannende Ruheoase mit Trockensalz-Mikroklima und feinem Steinsalz zum Spielen. Er kann als 45-minütiges Add-on für 5 € pro Kind zu jedem Besuch hinzugebucht werden (max. 8 Kinder je Sitzung).',
+        5,
+        true
+    ),
+    (
+        'Sicherheit & Hygiene',
+        'Wer hat die Aufsichtspflicht während des Besuchs?',
+        'Die Aufsichtspflicht verbleibt zu jedem Zeitpunkt bei den begleitenden Eltern oder Erziehungsberechtigten. Unser Café ist so gestaltet, dass du von den Tischen aus den gesamten Spielbereich gut im Blick hast.',
+        6,
+        true
+    )
+ON CONFLICT DO NOTHING;
+
+-- Gallery Items Seed
+INSERT INTO public.gallery_items (title, category, description, image_url, display_order, is_visible)
+VALUES
+    ('Pädagogischer Spielbereich', 'Spielbereich', 'Hochwertiges Holzspielzeug, sichere Klettermodule und Motorikstationen.', '/assets/spielbereich.jpg', 1, true),
+    ('Eltern-Café & Specialty Coffee', 'Café', 'Frisch zubereitete Kaffeespezialitäten, Bio-Tees und gesunde Kindersnacks.', '/assets/artisan-cafe.jpg', 2, true),
+    ('Kreatives Entdecken', 'Spielbereich', 'Liebevoll eingerichtete Spielinseln für fantasievolles und freies Spielen.', '/assets/gallery-3.jpg', 3, true),
+    ('Helle Wohlfühl-Atmosphäre', 'Café', 'Offenes Raumkonzept mit uneingeschränkter Sicht auf den Spielbereich.', '/assets/hero-interior.jpg', 4, true),
+    ('Geburtstags-Festtisch', 'Events', 'Festlich dekorierter Tisch mit bunten Details und Kindergeschirr.', '/assets/geburtstage.jpg', 5, true),
+    ('Salzraum-Ruheoase', 'Salzraum', 'Entspannendes Mikroklima mit feinem Trockensalz und kinderfreundlichen Spielzeugen.', '/assets/salt-sanctuary.jpg', 6, true)
+ON CONFLICT DO NOTHING;
+

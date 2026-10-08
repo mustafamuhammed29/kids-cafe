@@ -40,3 +40,116 @@ export interface DashboardMetrics {
   nextSlotBookedCount: number;
   pendingApprovals: number;
 }
+
+export interface OpeningHourItem {
+  days: string;
+  time: string;
+}
+
+export interface AdminBusinessSettings {
+  name: string;
+  tagline: string;
+  address: string;
+  phone: string;
+  email: string;
+  whatsappUrl: string;
+  instagramUrl?: string;
+  mapsUrl?: string;
+  logoUrl?: string;
+  faviconUrl?: string;
+  footerNotice?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  ogImageUrl?: string;
+  openingHours: OpeningHourItem[];
+  saltRoomAddonPrice: number;
+}
+
+export interface AdminPackage {
+  id: string;
+  slug: string;
+  name: string;
+  subtitle: string | null;
+  description: string;
+  category: 'standard' | 'group' | 'corporate';
+  priceType: 'fixed' | 'on-request' | 'from';
+  basePrice: number | null;
+  currency: string;
+  isVisible: boolean;
+  displayOrder: number;
+}
+
+export interface AdminBlockedDate {
+  id: string;
+  date: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface AdminTimeSlot {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  serviceId: string;
+  maxCapacity: number;
+  bookedCount: number;
+  isActive: boolean;
+}
+
+export type AnnouncementType = 'info' | 'warning' | 'success' | 'urgent';
+
+export interface AdminAnnouncement {
+  id: string;
+  message: string;
+  type: AnnouncementType;
+  linkUrl?: string | null;
+  linkText?: string | null;
+  isActive: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  createdAt: string;
+}
+
+export interface AdminFaq {
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  displayOrder: number;
+  isPublished: boolean;
+  createdAt: string;
+}
+
+export type InquiryStatus = 'new' | 'contacted' | 'reserved' | 'rejected' | 'archived';
+export type InquiryEventType = 'general' | 'birthday' | 'group_party' | 'group_event' | 'corporate';
+
+export interface AdminEventInquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  eventType: InquiryEventType;
+  targetDate?: string | null;
+  childrenCount?: number | null;
+  adultsCount?: number | null;
+  message: string;
+  status: InquiryStatus;
+  adminNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminGalleryItem {
+  id: string;
+  title: string;
+  category: string;
+  description: string | null;
+  imageUrl: string;
+  storagePath?: string | null;
+  displayOrder: number;
+  isVisible: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+

@@ -26,3 +26,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase temp & scripts screenshots
+supabase/.temp/
+scripts/*.png

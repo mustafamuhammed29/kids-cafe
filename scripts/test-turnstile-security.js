@@ -31,7 +31,7 @@ async function simulateEdgeFunction({
 
   const isProduction =
     environment === 'production' ||
-    origin.includes('havenkids.de') ||
+    origin.includes('havenkidscafe.de') ||
     !isLocalhost;
 
   // 1. Production Turnstile verification
@@ -74,7 +74,7 @@ async function simulateEdgeFunction({
   };
 
   // 3. Email dispatch uses cancellation_token internally
-  const emailCancelUrl = `https://havenkids.de/cancel?token=${dbResult.cancellation_token}`;
+  const emailCancelUrl = `https://havenkidscafe.de/stornierung?token=${dbResult.cancellation_token}`;
 
   // 4. Client response STRIPS cancellation_token
   const clientResponse = {
@@ -116,7 +116,7 @@ async function runTests() {
   {
     const res = await simulateEdgeFunction({
       environment: 'production',
-      origin: 'https://havenkids.de',
+      origin: 'https://havenkidscafe.de',
       clientIp: '203.0.113.195',
       turnstileSecretKey: '',
       turnstileToken: 'sample-token',
@@ -150,7 +150,7 @@ async function runTests() {
   {
     const res = await simulateEdgeFunction({
       environment: 'production',
-      origin: 'https://havenkids.de',
+      origin: 'https://havenkidscafe.de',
       clientIp: '203.0.113.195',
       turnstileSecretKey: '0x4AAAAAAABBBBBBB',
       turnstileToken: 'invalid-attacker-token',
@@ -168,7 +168,7 @@ async function runTests() {
   {
     const res = await simulateEdgeFunction({
       environment: 'production',
-      origin: 'https://havenkids.de',
+      origin: 'https://havenkidscafe.de',
       clientIp: '203.0.113.195',
       turnstileSecretKey: '0x4AAAAAAABBBBBBB',
       turnstileToken: 'valid-cf-token',

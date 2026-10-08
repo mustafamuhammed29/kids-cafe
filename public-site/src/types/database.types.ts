@@ -226,6 +226,225 @@ export type Database = {
         };
         Relationships: [];
       };
+      blocked_dates: {
+        Row: {
+          id: string;
+          date: string;
+          reason: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          date: string;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          date?: string;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      site_announcements: {
+        Row: {
+          id: string;
+          message: string;
+          type: 'info' | 'warning' | 'success' | 'urgent';
+          link_url: string | null;
+          link_text: string | null;
+          is_active: boolean;
+          starts_at: string | null;
+          ends_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          message: string;
+          type?: 'info' | 'warning' | 'success' | 'urgent';
+          link_url?: string | null;
+          link_text?: string | null;
+          is_active?: boolean;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          message?: string;
+          type?: 'info' | 'warning' | 'success' | 'urgent';
+          link_url?: string | null;
+          link_text?: string | null;
+          is_active?: boolean;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      faqs: {
+        Row: {
+          id: string;
+          category: string;
+          question: string;
+          answer: string;
+          display_order: number;
+          is_published: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category?: string;
+          question: string;
+          answer: string;
+          display_order?: number;
+          is_published?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category?: string;
+          question?: string;
+          answer?: string;
+          display_order?: number;
+          is_published?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      gallery_items: {
+        Row: {
+          id: string;
+          title: string;
+          category: string;
+          description: string | null;
+          image_url: string;
+          display_order: number;
+          is_visible: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          category?: string;
+          description?: string | null;
+          image_url: string;
+          display_order?: number;
+          is_visible?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          category?: string;
+          description?: string | null;
+          image_url?: string;
+          display_order?: number;
+          is_visible?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      business_settings: {
+        Row: {
+          key: string;
+          value: Json;
+          category: string;
+          description: string | null;
+          is_public: boolean;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value: Json;
+          category?: string;
+          description?: string | null;
+          is_public?: boolean;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          value?: Json;
+          category?: string;
+          description?: string | null;
+          is_public?: boolean;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      event_inquiries: {
+        Row: {
+          id: string;
+          name: string;
+          email: string;
+          phone: string | null;
+          event_type: 'general' | 'birthday' | 'group_party' | 'group_event' | 'corporate';
+          target_date: string | null;
+          children_count: number | null;
+          adults_count: number | null;
+          message: string;
+          status: 'new' | 'contacted' | 'reserved' | 'rejected' | 'archived';
+          admin_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          email: string;
+          phone?: string | null;
+          event_type?: 'general' | 'birthday' | 'group_party' | 'group_event' | 'corporate';
+          target_date?: string | null;
+          children_count?: number | null;
+          adults_count?: number | null;
+          message: string;
+          status?: 'new' | 'contacted' | 'reserved' | 'rejected' | 'archived';
+          admin_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          email?: string;
+          phone?: string | null;
+          event_type?: 'general' | 'birthday' | 'group_party' | 'group_event' | 'corporate';
+          target_date?: string | null;
+          children_count?: number | null;
+          adults_count?: number | null;
+          message?: string;
+          status?: 'new' | 'contacted' | 'reserved' | 'rejected' | 'archived';
+          admin_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

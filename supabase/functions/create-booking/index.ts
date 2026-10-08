@@ -5,7 +5,7 @@
 //    - Mock bypass allowed ONLY when ENVIRONMENT=development AND request originates from localhost.
 // 2. Cancellation Token Isolation:
 //    - Generated server-side by PostgreSQL create_booking_atomic.
-//    - Used ONLY in the confirmation email dispatched server-side (https://havenkids.de/cancel?token=...).
+//    - Used ONLY in the confirmation email dispatched server-side (https://havenkidscafe.de/stornierung?token=...).
 //    - STRIPPED from any JSON response returned to the client browser.
 // 3. Durable Distributed Rate Limiting:
 //    - Backed by PostgreSQL public.rate_limit_events table & check_and_record_ip_rate_limit function.
@@ -25,13 +25,23 @@ const TURNSTILE_SECRET_KEY = Deno.env.get('TURNSTILE_SECRET_KEY') || '';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || '';
 const ENVIRONMENT = Deno.env.get('ENVIRONMENT') || 'production';
 
-// Strict CORS Whitelist
+// Strict CORS Whitelist (Unified Production Domain: havenkidscafe.de)
 const ALLOWED_ORIGINS = [
   'http://localhost:4173',
   'http://localhost:5173',
-  'https://havenkids.de',
-  'https://www.havenkids.de',
+  'http://localhost:4174',
+  'http://localhost:5174',
+  'https://havenkidscafe.de',
+  'https://www.havenkidscafe.de',
+  'https://admin.havenkidscafe.de',
 ];
+
+function isOriginAllowed(origin: string): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (origin.endsWith('.vercel.app')) return true;
+  return false;
+}
 
 // ------------------------------------------------------------------------------
 // BEST-EFFORT EDGE IN-MEMORY CACHE (Note: Non-distributed fast-path filter only)
@@ -121,17 +131,14 @@ serve(async (req: Request) => {
     clientIp === '127.0.0.1' ||
     clientIp === '::1';
 
-  const isProduction =
-    ENVIRONMENT === 'production' ||
-    origin.includes('havenkids.de') ||
-    !isLocalhost;
-
-  const isAllowedOrigin = ALLOWED_ORIGINS.includes(origin);
+  const isProduction = ENVIRONMENT === 'production' && !isLocalhost;
+  const isAllowed = isOriginAllowed(origin);
 
   const corsHeaders: Record<string, string> = {
-    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://havenkidscafe.de',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
+    'Vary': 'Origin',
   };
 
   // 1. Handle Preflight OPTIONS
@@ -149,7 +156,7 @@ serve(async (req: Request) => {
 
   // 3. Strict Origin Validation on Production
   if (isProduction) {
-    if (!isAllowedOrigin || isLocalhost) {
+    if (!isAllowed) {
       console.warn(`[SECURITY] Aborted request from unauthorized or mismatched origin: ${origin}`);
       return new Response(JSON.stringify({ error: 'Origin nicht autorisiert.' }), {
         status: 403,
@@ -390,7 +397,7 @@ serve(async (req: Request) => {
     // 10. Trigger Confirmation Email via Resend (Server-Side)
     // The secret cancellation_token is used SOLELY in this private email cancel link.
     if (RESEND_API_KEY && rpcResult.cancellation_token) {
-      const cancelUrl = `https://havenkids.de/cancel?token=${rpcResult.cancellation_token}`;
+      const cancelUrl = `https://havenkidscafe.de/stornierung?token=${rpcResult.cancellation_token}`;
       const emailHtml = `
 <!DOCTYPE html>
 <html lang="de">
@@ -471,7 +478,7 @@ serve(async (req: Request) => {
       </div>
     </div>
     <div class="footer">
-      © 2026 Haven Kids Café · Friedrichstraße 123, 10117 Berlin · hello@havenkids.de
+      © 2026 Haven Kids Café · Friedrichstraße 123, 10117 Berlin · hallo@havenkidscafe.de
     </div>
   </div>
 </body>
@@ -485,7 +492,7 @@ serve(async (req: Request) => {
           Authorization: `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: 'Haven Kids Café <buchung@havenkids.de>',
+          from: 'Haven Kids Café <buchung@havenkidscafe.de>',
           to: [validated.email],
           subject: `Deine Buchungsbestätigung #${rpcResult.reference_code} — Haven Kids Café`,
           html: emailHtml,

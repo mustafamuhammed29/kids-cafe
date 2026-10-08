@@ -7,12 +7,12 @@ export const BUSINESS_INFO = {
   address: 'Friedrichstraße 123, 10117 Berlin, Deutschland',
   phone: '+49 30 1234 5678',
   phoneClean: '+493012345678',
-  email: 'hello@havenkids.de',
+  email: 'hallo@havenkidscafe.de',
   whatsappUrl: 'https://wa.me/493012345678?text=Hallo%20Haven%20Kids%20Caf%C3%A9%20Team%2C%20ich%20habe%20eine%20Frage%20zu%20meinem%20Besuch.',
   ageRange: '0 – 8 Jahre',
   maxSlotCapacity: 20,
   maxSaltRoomCapacity: 8,
-  medicalDisclaimer: 'Das mikroklimatische Salzraum-Erlebnis bietet eine beruhigende Atmosphäre und wohltuendes Raumklima. Unser Angebot dient der Entspannung und ersetzt keine medizinische Therapie oder Behandlung.',
+  medicalDisclaimer: 'Das mikroklimatische Salzraum-Erlebnis bietet eine beruhigende Atmosphäre und wohltuendes Raumklima. Unser Angebot dient der reinen Entspannung und dem Wohlbefinden und ersetzt keine medizinische Behandlung oder ärztliche Diagnose.',
   hours: [
     { days: 'Montag – Donnerstag', time: '10:00 – 18:00 Uhr' },
     { days: 'Freitag – Samstag', time: '09:00 – 19:00 Uhr' },
@@ -262,7 +262,7 @@ export const FAQS = [
     id: 'faq-4',
     category: 'Salzraum',
     question: 'Was ist das Besondere an eurem Salzraum?',
-    answer: 'Unser Salzraum nutzt moderne, zertifizierte Trockensalzgeneratoren. Das Raumklima ist sanft temperiert, hell und kinderfreundlich mit hellem Spielzeug eingerichtet. Hinweis: Das mikroklimatische Salzraum-Erlebnis bietet eine beruhigende Atmosphäre und wohltuendes Raumklima. Unser Angebot dient der Entspannung und ersetzt keine medizinische Therapie oder Behandlung.',
+    answer: 'Unser Salzraum nutzt moderne, zertifizierte Trockensalzgeneratoren. Das Raumklima ist sanft temperiert, hell und kinderfreundlich mit hellem Spielzeug eingerichtet. Hinweis: Das mikroklimatische Salzraum-Erlebnis bietet eine beruhigende Atmosphäre und wohltuendes Raumklima. Unser Angebot dient der reinen Entspannung und dem Wohlbefinden und ersetzt keine medizinische Behandlung oder ärztliche Diagnose.',
   },
   {
     id: 'faq-5',
@@ -280,6 +280,6 @@ export const FAQS = [
     id: 'faq-7',
     category: 'Sicherheit & Hygiene',
     question: 'Was passiert, wenn mein Kind kurzfristig krank wird?',
-    answer: 'Aus Rücksicht auf die Gesundheit aller kleinen Gäste bitten wir euch dringend, bei akuten Infekten (Fieber, Magen-Darm, starker Husten) zu Hause zu bleiben. Ihr könnt eure Reservierung über den Link in eurer Bestätigungs-E-Mail oder per kurzem WhatsApp-Klick kostenfrei und unkompliziert verschieben oder stornieren.',
+    answer: 'Aus Rücksicht auf die Gesundheit aller kleinen Gäste bitten wir euch dringend, bei akuten Infekten (Fieber, Magen-Darm, starker Husten) zu Hause zu bleiben. Ihr könnt eure Reservierung über den Link in eurer Bestätigungs-E-Mail bis zu 2 Stunden vor Beginn mit einem Klick kostenfrei online stornieren. Für neue Termine oder dringende Rückfragen steht euch unser Team jederzeit gerne per WhatsApp zur Verfügung.',
   },
 ];

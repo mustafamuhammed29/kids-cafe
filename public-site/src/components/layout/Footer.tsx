@@ -1,154 +1,152 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, Heart, MapPin } from 'lucide-react';
+import { Phone, Mail, MapPin, MessageCircle } from 'lucide-react';
 import { BUSINESS_INFO } from '../../data/mockData';
+import { getBusinessSettings, type BusinessSettings } from '../../services/contentService';
 
 interface FooterProps {
   onOpenLegal: (tab: 'impressum' | 'datenschutz' | 'agb') => void;
   onOpenBooking: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenLegal, onOpenBooking }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenLegal }) => {
+  const [settings, setSettings] = useState<BusinessSettings | null>(null);
+
+  useEffect(() => {
+    getBusinessSettings().then((data) => {
+      if (data) setSettings(data);
+    });
+  }, []);
+
+  const businessName = settings?.name || BUSINESS_INFO.name;
+  const address = settings?.address || BUSINESS_INFO.address;
+  const phone = settings?.phone || BUSINESS_INFO.phone;
+  const phoneClean = settings?.phoneClean || BUSINESS_INFO.phoneClean;
+  const email = settings?.email || BUSINESS_INFO.email;
+  const whatsappUrl = settings?.whatsappUrl || BUSINESS_INFO.whatsappUrl;
+  const instagramUrl = settings?.instagramUrl || 'https://instagram.com/havenkidscafe';
+  const mapsUrl = settings?.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+  const hours = settings?.openingHours || BUSINESS_INFO.hours;
+  const footerNotice = settings?.footerNotice || 'Der Wohlfühlort für freies Entfalten in Berlin: Pädagogischer Spielbereich für Kinder (0-8 Jahre), sanfter Salzraum und feiner Barista-Kaffee für Eltern.';
+
   return (
-    <footer className="bg-[#183D3D] text-gray-200 pt-16 pb-24 sm:pb-12 border-t-4 border-[#93B1A6]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8 mb-12">
-          {/* Brand Info */}
-          <div className="space-y-4 lg:col-span-2">
-            <Link to="/" className="inline-block">
-              <img
-                src="/assets/logo.svg"
-                alt="Haven Kids Café Logo"
-                className="h-10 w-auto brightness-0 invert opacity-95"
-              />
-            </Link>
-            <p className="text-sm text-gray-300 leading-relaxed max-w-sm">
-              Das liebevolle Familien-Spielcafé in Berlin. Pädagogisch wertvolles Holzspielzeug, entspannender Salzraum und Specialty Coffee für Eltern (Kinder von 0 bis 8 Jahren).
-            </p>
-            <div className="pt-1 flex gap-3">
-              <a
-                href={BUSINESS_INFO.whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 text-xs font-semibold hover:bg-emerald-800/80 transition-colors"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                WhatsApp Service
-              </a>
+    <footer className="bg-dark text-gray-300 pt-16 pb-24 md:pb-12 border-t border-gray-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+        {/* Col 1: Brand & Mission */}
+        <div>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2.5 mb-5 group cursor-pointer"
+            aria-label="Zur Startseite von Haven Kids Café"
+          >
+            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+              <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
-          </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Navigation</h3>
-            <ul className="space-y-2.5 text-xs sm:text-sm text-gray-300">
-              <li>
-                <Link to="/services" className="hover:text-[#93B1A6] transition-colors">
-                  Angebote & Ausstattung
-                </Link>
-              </li>
-              <li>
-                <Link to="/pricing" className="hover:text-[#93B1A6] transition-colors">
-                  Preise & Pakete
-                </Link>
-              </li>
-              <li>
-                <Link to="/gallery" className="hover:text-[#93B1A6] transition-colors">
-                  Fotogalerie
-                </Link>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={onOpenBooking}
-                  className="hover:text-[#93B1A6] transition-colors text-left font-semibold text-[#FFD3B6] cursor-pointer"
-                >
-                  Online reservieren
-                </button>
-              </li>
-              <li>
-                <Link to="/faq" className="hover:text-[#93B1A6] transition-colors">
-                  Häufige Fragen (FAQ)
-                </Link>
-              </li>
-              <li>
-                <Link to="/contact" className="hover:text-[#93B1A6] transition-colors">
-                  Kontakt & Anfahrt
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Opening Hours */}
-          <div>
-            <h3 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Öffnungszeiten</h3>
-            <ul className="space-y-2 text-xs text-gray-300">
-              {BUSINESS_INFO.hours.map((h, i) => (
-                <li key={i} className="flex justify-between border-b border-gray-700/60 pb-1.5 gap-2">
-                  <span className="text-gray-300">{h.days}</span>
-                  <span className="font-semibold text-white whitespace-nowrap">{h.time}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-[11px] text-gray-400 mt-2.5 italic">
-              Einlass nur mit Vorab-Reservierung.
-            </p>
-          </div>
-
-          {/* Standort & Kontakt */}
-          <div>
-            <h3 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Standort</h3>
-            <p className="text-xs text-gray-300 leading-relaxed mb-2.5 flex items-start gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-[#93B1A6] shrink-0 mt-0.5" />
-              <span>{BUSINESS_INFO.address}</span>
-            </p>
-            <p className="text-xs text-gray-400 leading-relaxed mb-3">
-              Zentral erreichbar nahe Friedrichstraße (Berlin-Mitte).
-            </p>
+            <span className="font-bold text-2xl text-white tracking-tight">Haven <span className="text-primary">Kids</span></span>
+          </Link>
+          <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+            {footerNotice}
+          </p>
+          <div className="flex items-center gap-3">
+            {/* Instagram */}
             <a
-              href={`mailto:${BUSINESS_INFO.email}`}
-              className="text-xs text-[#93B1A6] hover:text-white transition font-medium underline"
+              href={instagramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Haven Kids Café auf Instagram"
+              className="w-11 h-11 rounded-xl bg-white/5 flex items-center justify-center hover:bg-primary hover:text-white transition-colors border border-white/10 cursor-pointer"
             >
-              {BUSINESS_INFO.email}
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              </svg>
+            </a>
+            {/* WhatsApp */}
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Haven Kids Café per WhatsApp kontaktieren"
+              className="w-11 h-11 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-colors border border-emerald-500/30 cursor-pointer"
+            >
+              <MessageCircle className="w-5 h-5" />
             </a>
           </div>
         </div>
 
-        {/* Disclaimer Bar */}
-        <div className="border-t border-gray-700/70 pt-5 pb-5 text-xs text-gray-400 leading-relaxed">
-          <p>
-            <strong className="text-gray-300">Rechtlicher Hinweis:</strong> {BUSINESS_INFO.medicalDisclaimer}
-          </p>
+        {/* Col 2: Navigation Links */}
+        <div>
+          <h4 className="text-white font-bold mb-5 text-base sm:text-lg">Navigation</h4>
+          <ul className="space-y-2.5 font-medium text-sm text-gray-400">
+            <li><Link to="/services" className="hover:text-primary transition-colors">Unsere Angebote</Link></li>
+            <li><Link to="/pricing" className="hover:text-primary transition-colors">Eintritt &amp; Preise</Link></li>
+            <li><Link to="/gallery" className="hover:text-primary transition-colors">Bildergalerie</Link></li>
+            <li><Link to="/faq" className="hover:text-primary transition-colors">Häufige Fragen (FAQ)</Link></li>
+            <li><Link to="/contact" className="hover:text-primary transition-colors">Kontakt &amp; Anfahrt</Link></li>
+          </ul>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-gray-800 pt-5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-400">
-          <p className="flex items-center gap-1 text-center sm:text-left">
-            &copy; 2026 {BUSINESS_INFO.name}. Alle Rechte vorbehalten. Gestaltet mit <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400 inline" /> für Familien.
-          </p>
-          <div className="flex gap-5">
-            <button
-              type="button"
-              onClick={() => onOpenLegal('impressum')}
-              className="hover:text-[#93B1A6] transition-colors cursor-pointer"
-            >
-              Impressum
-            </button>
-            <button
-              type="button"
-              onClick={() => onOpenLegal('datenschutz')}
-              className="hover:text-[#93B1A6] transition-colors cursor-pointer"
-            >
-              Datenschutz (DSGVO)
-            </button>
-            <button
-              type="button"
-              onClick={() => onOpenLegal('agb')}
-              className="hover:text-[#93B1A6] transition-colors cursor-pointer"
-            >
-              AGB &amp; Regeln
-            </button>
-          </div>
+        {/* Col 3: Öffnungszeiten */}
+        <div>
+          <h4 className="text-white font-bold mb-5 text-base sm:text-lg">Öffnungszeiten</h4>
+          <ul className="space-y-2.5 font-medium text-sm text-gray-400">
+            {hours.map((item, idx) => (
+              <li key={idx} className="flex justify-between border-b border-white/5 pb-2">
+                <span>{item.days}</span>
+                <span className="text-white font-semibold">{item.time}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Col 4: Direkter Kontakt & Anfahrt */}
+        <div>
+          <h4 className="text-white font-bold mb-5 text-base sm:text-lg">Kontakt &amp; Standort</h4>
+          <ul className="space-y-3 font-medium text-sm text-gray-400">
+            <li>
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white transition flex items-start gap-2.5 group"
+                title="In Google Maps öffnen"
+              >
+                <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                <span>{address}</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href={`tel:${phoneClean}`}
+                className="hover:text-white transition flex items-center gap-2.5 group"
+                title="Jetzt anrufen"
+              >
+                <Phone className="w-4 h-4 text-primary shrink-0 group-hover:scale-110 transition-transform" />
+                <span>{phone}</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href={`mailto:${email}`}
+                className="hover:text-white transition flex items-center gap-2.5 group"
+                title="E-Mail senden"
+              >
+                <Mail className="w-4 h-4 text-primary shrink-0 group-hover:scale-110 transition-transform" />
+                <span>{email}</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Bottom Legal Bar */}
+      <div className="mt-14 pt-8 border-t border-white/10 text-center text-xs sm:text-sm text-gray-500 flex flex-col md:flex-row justify-between items-center max-w-7xl mx-auto px-4 font-medium gap-4">
+        <p>&copy; {new Date().getFullYear()} {businessName}. Alle Rechte vorbehalten.</p>
+        <div className="space-x-6 flex flex-wrap justify-center gap-y-2 text-xs sm:text-sm">
+          <Link to="/datenschutz" onClick={() => onOpenLegal?.('datenschutz')} className="hover:text-white transition-colors cursor-pointer">Datenschutz</Link>
+          <Link to="/impressum" onClick={() => onOpenLegal?.('impressum')} className="hover:text-white transition-colors cursor-pointer">Impressum</Link>
+          <Link to="/agb" onClick={() => onOpenLegal?.('agb')} className="hover:text-white transition-colors cursor-pointer">AGB</Link>
         </div>
       </div>
     </footer>
