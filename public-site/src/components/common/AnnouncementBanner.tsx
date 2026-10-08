@@ -66,36 +66,36 @@ export const AnnouncementBanner: React.FC = () => {
         className={`relative max-w-4xl w-full rounded-full border backdrop-blur-xl px-2.5 sm:px-3.5 py-1.5 sm:py-2 flex items-center justify-between gap-2.5 sm:gap-3 transition-all duration-300 select-none ${typeConfig.pillStyle}`}
       >
         {/* Left Glowing Badge with Pulsing Live Dot */}
-        <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
+        <div className="shrink-0 flex items-center">
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider border shadow-xs ${typeConfig.badgeBg}`}
+            className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider border shadow-xs ${typeConfig.badgeBg}`}
           >
             <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${typeConfig.dotBg}`} />
               <span className={`relative inline-flex rounded-full h-2 w-2 ${typeConfig.dotBg}`} />
             </span>
-            <IconComp className="w-3 h-3 shrink-0" />
-            <span className="hidden xs:inline">{typeConfig.label}</span>
+            <IconComp className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden md:inline">{typeConfig.label}</span>
           </span>
         </div>
 
         {/* Center: Smooth Marquee Moving Text (الكتابة تمشي) */}
-        <div className="flex-1 overflow-hidden relative marquee-mask min-w-0 flex items-center">
-          <div className="animate-marquee py-0.5 flex items-center gap-8 sm:gap-12 text-xs sm:text-sm font-semibold tracking-wide">
+        <div className="flex-1 overflow-hidden relative marquee-mask min-w-0 flex items-center pointer-events-none select-none">
+          <div className="animate-marquee py-0.5 flex items-center gap-6 sm:gap-10 text-xs sm:text-sm font-semibold tracking-wide select-none">
             {/* Duplicated for seamless infinite marquee loop */}
-            <span className="flex items-center gap-3 shrink-0">
+            <span className="flex items-center gap-2.5 sm:gap-3 shrink-0">
               <span>{announcement.message}</span>
               <span className="opacity-40 text-xs">✦</span>
             </span>
-            <span className="flex items-center gap-3 shrink-0">
+            <span className="flex items-center gap-2.5 sm:gap-3 shrink-0">
               <span>{announcement.message}</span>
               <span className="opacity-40 text-xs">✦</span>
             </span>
-            <span className="flex items-center gap-3 shrink-0">
+            <span className="flex items-center gap-2.5 sm:gap-3 shrink-0">
               <span>{announcement.message}</span>
               <span className="opacity-40 text-xs">✦</span>
             </span>
-            <span className="flex items-center gap-3 shrink-0">
+            <span className="flex items-center gap-2.5 sm:gap-3 shrink-0">
               <span>{announcement.message}</span>
               <span className="opacity-40 text-xs">✦</span>
             </span>
@@ -109,9 +109,9 @@ export const AnnouncementBanner: React.FC = () => {
               href={safeUrl}
               target={isExternal ? '_blank' : undefined}
               rel={isExternal ? 'noopener noreferrer' : undefined}
-              className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold px-3 py-1 rounded-full transition-transform active:scale-95 shadow-md ${typeConfig.btnStyle}`}
+              className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 py-1 rounded-full transition-transform active:scale-95 shadow-md shrink-0 ${typeConfig.btnStyle}`}
             >
-              <span>{announcement.linkText || 'Details'}</span>
+              <span className="hidden sm:inline">{announcement.linkText || 'Details'}</span>
               <ArrowRight className="w-3 h-3" />
             </a>
           )}
@@ -121,9 +121,9 @@ export const AnnouncementBanner: React.FC = () => {
             onClick={() => setDismissed(true)}
             aria-label="Hinweis schließen"
             title="Schließen"
-            className="w-7 h-7 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition cursor-pointer shrink-0 border border-white/10"
+            className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition cursor-pointer shrink-0 border border-white/10"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </button>
         </div>
       </div>
