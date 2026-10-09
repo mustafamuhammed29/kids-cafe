@@ -71,6 +71,15 @@ export const DEFAULT_ADMIN_PACKAGES: AdminPackage[] = [
     currency: '€',
     isVisible: true,
     displayOrder: 1,
+    features: [
+      '2 Stunden Spielzeit im Entdeckerbereich',
+      'Bis zu 2 Begleitpersonen kostenfrei',
+      'Freier Zugang zu Café & Lounge',
+      'Garderobe & Spind inklusive',
+      'Salzraum für 5 € zubuchbar',
+    ],
+    ctaText: 'Jetzt buchen',
+    ctaAction: 'book',
   },
   {
     id: 'pkg-2',
@@ -84,6 +93,15 @@ export const DEFAULT_ADMIN_PACKAGES: AdminPackage[] = [
     currency: '€',
     isVisible: true,
     displayOrder: 2,
+    features: [
+      '10 x 2 Stunden Spielzeit (Ersparnis 20 €)',
+      '12 Monate volle Gültigkeit ab Kaufdatum',
+      'Übertragbar auf Geschwisterkinder',
+      'Inklusive 1x Salzraum-Besuch gratis',
+      'Priorisierte Reservierung bei Ferienzeiten',
+    ],
+    ctaText: 'Pass sichern',
+    ctaAction: 'book',
   },
   {
     id: 'pkg-3',
@@ -92,11 +110,20 @@ export const DEFAULT_ADMIN_PACKAGES: AdminPackage[] = [
     subtitle: 'Das Rundum-Sorglos-Paket',
     description: 'Die perfekte Geburtstagsparty für bis zu 8 Kinder im geschmückten Partybereich.',
     category: 'standard',
-    priceType: 'fixed',
+    priceType: 'from',
     basePrice: 250.00,
     currency: '€',
     isVisible: true,
     displayOrder: 3,
+    features: [
+      '3 Stunden exklusiver Festtisch & Deko',
+      'Bis zu 8 Kinder (weitere zubuchbar)',
+      'Bio-Fruchtsäfte & Wasser-Flatrate',
+      'Bunte Geburtstagsdekoration nach Wunsch',
+      'Überraschungsgeschenk für das Geburtstagskind',
+    ],
+    ctaText: 'Termin anfragen',
+    ctaAction: 'book',
   },
   {
     id: 'pkg-4',
@@ -110,6 +137,14 @@ export const DEFAULT_ADMIN_PACKAGES: AdminPackage[] = [
     currency: '€',
     isVisible: true,
     displayOrder: 4,
+    features: [
+      'Bis zu 15 Kinder + Begleitpersonen',
+      '3 Stunden exklusive Raumnutzung',
+      'Eigene Betreuungskraft optional zubuchbar',
+      'Individuelles Catering-Arrangement',
+    ],
+    ctaText: 'Anfrage stellen',
+    ctaAction: 'whatsapp',
   },
   {
     id: 'pkg-5',
@@ -123,6 +158,14 @@ export const DEFAULT_ADMIN_PACKAGES: AdminPackage[] = [
     currency: '€',
     isVisible: true,
     displayOrder: 5,
+    features: [
+      'Für Kitas, Schulklassen & Sportvereine',
+      'Exklusive Vormittagszeiten außerhalb regulärer Öffnung',
+      'Pädagogische Bewegungsspiele & Motorikparcours',
+      'Sonderkonditionen für gemeinnützige Träger',
+    ],
+    ctaText: 'Gruppentarif anfragen',
+    ctaAction: 'contact-form',
   },
   {
     id: 'pkg-6',
@@ -136,6 +179,14 @@ export const DEFAULT_ADMIN_PACKAGES: AdminPackage[] = [
     currency: '€',
     isVisible: true,
     displayOrder: 6,
+    features: [
+      'Exklusive Gesamtanmietung des gesamten Cafés',
+      'Professionelles Barista- & Catering-Team',
+      'Audiotechnik & Beamer für Präsentationen',
+      'Kinderbetreuung während der Eltern-Workshops',
+    ],
+    ctaText: 'Firmenevent anfragen',
+    ctaAction: 'whatsapp',
   },
 ];
 
@@ -339,11 +390,11 @@ export async function saveBusinessSettings(
 }
 
 // ==============================================================================
-// 2. PACKAGES & PRICING API
+// 2. PACKAGES & PRICING API (FULL CRUD)
 // ==============================================================================
 export async function fetchAdminPackages(): Promise<AdminPackage[]> {
   if (!isSupabaseConfigured) {
-    return memoryPackages;
+    return [...memoryPackages].sort((a, b) => a.displayOrder - b.displayOrder);
   }
 
   try {
@@ -353,52 +404,342 @@ export async function fetchAdminPackages(): Promise<AdminPackage[]> {
       .order('display_order', { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return memoryPackages;
+      return [...memoryPackages].sort((a, b) => a.displayOrder - b.displayOrder);
     }
 
     return data.map((row: any) => ({
       id: row.id,
       slug: row.slug,
       name: row.name,
-      subtitle: row.subtitle,
-      description: row.description,
-      category: row.category,
-      priceType: row.price_type,
-      basePrice: row.base_price !== null ? Number(row.base_price) : null,
+      subtitle: row.subtitle || null,
+      description: row.description || '',
+      category: row.category || 'standard',
+      priceType: row.price_type || 'fixed',
+      basePrice: row.base_price !== null && row.base_price !== undefined ? Number(row.base_price) : null,
       currency: row.currency || '€',
-      isVisible: row.is_visible,
-      displayOrder: row.display_order,
+      features: Array.isArray(row.features)
+        ? row.features
+        : (typeof row.features === 'string'
+          ? (() => { try { return JSON.parse(row.features); } catch { return []; } })()
+          : []),
+      ctaText: row.cta_text || 'Jetzt buchen',
+      ctaAction: row.cta_action || 'book',
+      isVisible: row.is_visible ?? true,
+      displayOrder: row.display_order ?? 1,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     }));
   } catch (err) {
     console.error('Error fetching admin packages:', err);
-    return memoryPackages;
+    return [...memoryPackages].sort((a, b) => a.displayOrder - b.displayOrder);
   }
 }
 
-export async function updateAdminPackage(
-  id: string,
-  updates: { basePrice?: number | null; isVisible?: boolean; displayOrder?: number }
-): Promise<{ success: boolean; error?: string }> {
+export async function saveAdminPackage(
+  pkg: Partial<AdminPackage>
+): Promise<{ success: boolean; error?: string; item?: AdminPackage }> {
+  // 1. Validation
+  const name = pkg.name?.trim();
+  if (!name) {
+    return { success: false, error: 'Paketname darf nicht leer sein.' };
+  }
+
+  let cleanSlug = (pkg.slug || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, '-');
+
+  if (!cleanSlug) {
+    cleanSlug = name
+      .toLowerCase()
+      .replace(/ä/g, 'ae')
+      .replace(/ö/g, 'oe')
+      .replace(/ü/g, 'ue')
+      .replace(/ß/g, 'ss')
+      .replace(/[^a-z0-9-_]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+
+  if (!cleanSlug) {
+    return { success: false, error: 'Ein gültiger Slug (z. B. "einzelbesuch") ist erforderlich.' };
+  }
+
+  const category = pkg.category || 'standard';
+  const priceType = pkg.priceType || 'fixed';
+  const basePrice = priceType === 'on-request' ? null : (pkg.basePrice !== undefined && pkg.basePrice !== null ? Number(pkg.basePrice) : null);
+  const currency = pkg.currency || '€';
+  const ctaText = pkg.ctaText?.trim() || (priceType === 'on-request' ? 'Anfrage stellen' : 'Jetzt buchen');
+  const ctaAction = pkg.ctaAction || (priceType === 'on-request' ? 'whatsapp' : 'book');
+  const features = Array.isArray(pkg.features)
+    ? pkg.features.map((f) => f.trim()).filter((f) => f.length > 0)
+    : [];
+  const isVisible = pkg.isVisible ?? true;
+  const displayOrder = pkg.displayOrder ?? 1;
+
   if (!isSupabaseConfigured) {
-    memoryPackages = memoryPackages.map((p) => (p.id === id ? { ...p, ...updates } : p));
+    if (pkg.id && !pkg.id.startsWith('new-')) {
+      const idx = memoryPackages.findIndex((p) => p.id === pkg.id);
+      if (idx !== -1) {
+        // Slug collision check
+        if (memoryPackages.some((p) => p.slug === cleanSlug && p.id !== pkg.id)) {
+          return { success: false, error: `Der Slug "${cleanSlug}" wird bereits von einem anderen Paket verwendet.` };
+        }
+
+        const updated: AdminPackage = {
+          ...memoryPackages[idx],
+          slug: cleanSlug,
+          name,
+          subtitle: pkg.subtitle?.trim() || null,
+          description: pkg.description?.trim() || '',
+          category,
+          priceType,
+          basePrice,
+          currency,
+          features,
+          ctaText,
+          ctaAction,
+          isVisible,
+          displayOrder,
+          updatedAt: new Date().toISOString(),
+        };
+        memoryPackages[idx] = updated;
+        memoryPackages.sort((a, b) => a.displayOrder - b.displayOrder);
+        return { success: true, item: updated };
+      }
+    }
+
+    if (memoryPackages.some((p) => p.slug === cleanSlug)) {
+      return { success: false, error: `Der Slug "${cleanSlug}" wird bereits verwendet. Bitte wähle einen eindeutigen Slug.` };
+    }
+
+    const newItem: AdminPackage = {
+      id: `pkg-${Date.now()}`,
+      slug: cleanSlug,
+      name,
+      subtitle: pkg.subtitle?.trim() || null,
+      description: pkg.description?.trim() || '',
+      category,
+      priceType,
+      basePrice,
+      currency,
+      features,
+      ctaText,
+      ctaAction,
+      isVisible,
+      displayOrder,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    memoryPackages = [...memoryPackages, newItem].sort((a, b) => a.displayOrder - b.displayOrder);
+    return { success: true, item: newItem };
+  }
+
+  try {
+    const payload: Record<string, any> = {
+      slug: cleanSlug,
+      name,
+      subtitle: pkg.subtitle?.trim() || null,
+      description: pkg.description?.trim() || '',
+      category,
+      price_type: priceType,
+      base_price: basePrice,
+      currency,
+      features,
+      cta_text: ctaText,
+      cta_action: ctaAction,
+      is_visible: isVisible,
+      display_order: displayOrder,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (pkg.id && !pkg.id.startsWith('new-')) {
+      const { data, error } = await supabase
+        .from('packages')
+        .update(payload)
+        .eq('id', pkg.id)
+        .select('*')
+        .single();
+
+      if (error) return { success: false, error: error.message };
+
+      const item: AdminPackage = {
+        id: data.id,
+        slug: data.slug,
+        name: data.name,
+        subtitle: data.subtitle,
+        description: data.description,
+        category: data.category,
+        priceType: data.price_type,
+        basePrice: data.base_price !== null ? Number(data.base_price) : null,
+        currency: data.currency,
+        features: Array.isArray(data.features) ? data.features : [],
+        ctaText: data.cta_text,
+        ctaAction: data.cta_action,
+        isVisible: data.is_visible,
+        displayOrder: data.display_order,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+
+      return { success: true, item };
+    } else {
+      const { data, error } = await supabase
+        .from('packages')
+        .insert([payload])
+        .select('*')
+        .single();
+
+      if (error) return { success: false, error: error.message };
+
+      const item: AdminPackage = {
+        id: data.id,
+        slug: data.slug,
+        name: data.name,
+        subtitle: data.subtitle,
+        description: data.description,
+        category: data.category,
+        priceType: data.price_type,
+        basePrice: data.base_price !== null ? Number(data.base_price) : null,
+        currency: data.currency,
+        features: Array.isArray(data.features) ? data.features : [],
+        ctaText: data.cta_text,
+        ctaAction: data.cta_action,
+        isVisible: data.is_visible,
+        displayOrder: data.display_order,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+      };
+
+      return { success: true, item };
+    }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Fehler beim Speichern des Pakets' };
+  }
+}
+
+export async function deleteAdminPackage(id: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    memoryPackages = memoryPackages.filter((p) => p.id !== id);
     return { success: true };
   }
 
   try {
-    const payload: Record<string, any> = {};
-    if (updates.basePrice !== undefined) payload.base_price = updates.basePrice;
-    if (updates.isVisible !== undefined) payload.is_visible = updates.isVisible;
-    if (updates.displayOrder !== undefined) payload.display_order = updates.displayOrder;
-
     const { error } = await supabase
       .from('packages')
-      .update(payload)
+      .delete()
       .eq('id', id);
 
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (err: unknown) {
-    return { success: false, error: err instanceof Error ? err.message : 'Fehler beim Aktualisieren des Pakets' };
+    return { success: false, error: err instanceof Error ? err.message : 'Fehler beim Löschen des Pakets' };
+  }
+}
+
+export async function duplicateAdminPackage(
+  id: string
+): Promise<{ success: boolean; error?: string; item?: AdminPackage }> {
+  const all = await fetchAdminPackages();
+  const original = all.find((p) => p.id === id);
+  if (!original) {
+    return { success: false, error: 'Original-Paket nicht gefunden' };
+  }
+
+  const suffix = Math.floor(100 + Math.random() * 900);
+  const newSlug = `${original.slug}-kopie-${suffix}`;
+  const newName = `${original.name} (Kopie)`;
+  const maxOrder = all.length > 0 ? Math.max(...all.map((p) => p.displayOrder)) : 0;
+
+  return saveAdminPackage({
+    slug: newSlug,
+    name: newName,
+    subtitle: original.subtitle,
+    description: original.description,
+    category: original.category,
+    priceType: original.priceType,
+    basePrice: original.basePrice,
+    currency: original.currency,
+    features: original.features ? [...original.features] : [],
+    ctaText: original.ctaText,
+    ctaAction: original.ctaAction,
+    isVisible: false, // New copies start as unpublished draft
+    displayOrder: maxOrder + 1,
+  });
+}
+
+export async function updateAdminPackage(
+  id: string,
+  updates: Partial<AdminPackage>
+): Promise<{ success: boolean; error?: string }> {
+  const res = await saveAdminPackage({ id, ...updates });
+  return { success: res.success, error: res.error };
+}
+
+export async function reorderAdminPackages(
+  orderedIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    memoryPackages = memoryPackages
+      .map((p) => {
+        const idx = orderedIds.indexOf(p.id);
+        return idx !== -1 ? { ...p, displayOrder: idx + 1 } : p;
+      })
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+    return { success: true };
+  }
+
+  try {
+    for (let i = 0; i < orderedIds.length; i++) {
+      const id = orderedIds[i];
+      await supabase
+        .from('packages')
+        .update({ display_order: i + 1, updated_at: new Date().toISOString() })
+        .eq('id', id);
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Fehler beim Neuanordnen der Pakete' };
+  }
+}
+
+export async function resetAdminPackagesToDefault(): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    memoryPackages = [...DEFAULT_ADMIN_PACKAGES];
+    return { success: true };
+  }
+
+  try {
+    // Delete all current packages
+    const { error: delError } = await supabase
+      .from('packages')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (delError) return { success: false, error: delError.message };
+
+    const payloads = DEFAULT_ADMIN_PACKAGES.map((pkg) => ({
+      slug: pkg.slug,
+      name: pkg.name,
+      subtitle: pkg.subtitle,
+      description: pkg.description,
+      category: pkg.category,
+      price_type: pkg.priceType,
+      base_price: pkg.basePrice,
+      currency: pkg.currency,
+      features: pkg.features || [],
+      cta_text: pkg.ctaText || 'Jetzt buchen',
+      cta_action: pkg.ctaAction || 'book',
+      is_visible: pkg.isVisible,
+      display_order: pkg.displayOrder,
+    }));
+
+    const { error: insError } = await supabase.from('packages').insert(payloads);
+    if (insError) return { success: false, error: insError.message };
+
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Fehler beim Zurücksetzen der Pakete' };
   }
 }
 

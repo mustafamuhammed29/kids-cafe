@@ -387,15 +387,24 @@ export async function getPackages(): Promise<ServiceItem[]> {
 
     return data.map((pkg) => {
       const mock = SERVICES.find((s) => s.slug === pkg.slug);
-      const categoryType = pkg.slug === 'einzelbesuch'
-        ? 'single'
-        : (pkg.slug === '10er-block'
-          ? 'pass_redemption'
-          : (pkg.slug === 'kindergeburtstag'
-            ? 'birthday'
-            : (pkg.slug === 'gruppenfeier'
-              ? 'group_party'
-              : (pkg.slug === 'gruppen-events' ? 'group_event' : 'corporate_event'))));
+      let categoryType = mock?.category;
+      if (!categoryType) {
+        if (pkg.category === 'group') categoryType = 'group_party';
+        else if (pkg.category === 'corporate') categoryType = 'corporate_event';
+        else if (pkg.slug.includes('geburtstag')) categoryType = 'birthday';
+        else categoryType = 'single';
+      }
+
+      let priceLabel = mock?.priceLabel;
+      if (pkg.price_type === 'on-request') {
+        priceLabel = 'Auf Anfrage';
+      } else if (pkg.price_type === 'from' && pkg.base_price !== null) {
+        priceLabel = `ab ${pkg.base_price} €`;
+      } else if (pkg.base_price !== null) {
+        priceLabel = `${pkg.base_price} €`;
+      } else if (!priceLabel) {
+        priceLabel = 'Auf Anfrage';
+      }
 
       return {
         id: pkg.slug,
@@ -409,11 +418,11 @@ export async function getPackages(): Promise<ServiceItem[]> {
         priceType: pkg.price_type,
         basePrice: pkg.base_price !== null ? Number(pkg.base_price) : undefined,
         currency: pkg.currency || '€',
-        priceLabel: pkg.base_price !== null ? `${pkg.base_price} €` : (mock?.priceLabel || 'Auf Anfrage'),
+        priceLabel,
         description: pkg.description,
-        features: Array.isArray(pkg.features) ? (pkg.features as string[]) : (mock?.features || []),
-        ctaText: pkg.cta_text,
-        ctaAction: pkg.cta_action,
+        features: Array.isArray(pkg.features) && pkg.features.length > 0 ? (pkg.features as string[]) : (mock?.features || []),
+        ctaText: pkg.cta_text || 'Jetzt buchen',
+        ctaAction: pkg.cta_action || 'book',
         isVisible: pkg.is_visible,
         badge: mock?.badge,
         popular: mock?.popular,

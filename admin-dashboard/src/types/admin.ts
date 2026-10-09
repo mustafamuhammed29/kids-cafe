@@ -75,8 +75,13 @@ export interface AdminPackage {
   priceType: 'fixed' | 'on-request' | 'from';
   basePrice: number | null;
   currency: string;
+  features?: string[];
+  ctaText?: string;
+  ctaAction?: 'book' | 'whatsapp' | 'contact-form';
   isVisible: boolean;
   displayOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AdminBlockedDate {

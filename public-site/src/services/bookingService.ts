@@ -41,23 +41,34 @@ export async function getBookingPackages(): Promise<ServiceItem[]> {
 
     return data.map((pkg): ServiceItem => {
       const existing = SERVICES.find((s) => s.slug === pkg.slug);
+      let priceLabel = existing?.priceLabel;
+      if (pkg.price_type === 'on-request') {
+        priceLabel = 'Auf Anfrage';
+      } else if (pkg.price_type === 'from' && pkg.base_price !== null) {
+        priceLabel = `ab ${pkg.base_price} €`;
+      } else if (pkg.base_price !== null) {
+        priceLabel = `${pkg.base_price} €`;
+      } else if (!priceLabel) {
+        priceLabel = 'Auf Anfrage';
+      }
+
       return {
         id: pkg.id,
         slug: pkg.slug,
         name: pkg.name,
         subtitle: pkg.subtitle || undefined,
-        tagline: existing ? existing.tagline : pkg.name,
-        category: existing ? existing.category : 'single',
+        tagline: existing ? existing.tagline : (pkg.subtitle || pkg.name),
+        category: existing ? existing.category : (pkg.category === 'group' ? 'group_party' : (pkg.category === 'corporate' ? 'corporate_event' : 'single')),
         packageCategory: pkg.category,
         durationMinutes: existing ? existing.durationMinutes : 120,
         priceType: pkg.price_type,
         basePrice: pkg.base_price !== null ? Number(pkg.base_price) : undefined,
-        currency: pkg.currency,
-        priceLabel: pkg.price_type === 'on-request' ? 'Auf Anfrage' : `${pkg.base_price} €`,
+        currency: pkg.currency || '€',
+        priceLabel,
         description: pkg.description,
-        features: Array.isArray(pkg.features) ? (pkg.features as string[]) : [],
-        ctaText: pkg.cta_text,
-        ctaAction: pkg.cta_action,
+        features: Array.isArray(pkg.features) && pkg.features.length > 0 ? (pkg.features as string[]) : (existing?.features || []),
+        ctaText: pkg.cta_text || 'Jetzt buchen',
+        ctaAction: pkg.cta_action || 'book',
         isVisible: pkg.is_visible,
         popular: existing?.popular,
       };
