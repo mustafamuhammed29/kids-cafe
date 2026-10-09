@@ -443,18 +443,69 @@ serve(async (req: Request) => {
     // 10. Trigger Confirmation Email via Resend (Server-Side)
     // The secret cancellation_token is used SOLELY in this private email cancel link.
     if (RESEND_API_KEY && rpcResult.cancellation_token) {
+      // Default template values
+      let headerColor = '#2D5A47';
+      let headerTagline = 'Buchungsbestätigung & Besuchsinformationen';
+      let logoUrl = '';
+      let showLogo = true;
+      let greetingText = 'vielen Dank für deine Reservierung! Dein Besuch im Haven Kids Café ist verbindlich gebucht.';
+      let visitGuidelines = [
+        'Bitte bringe rutschfeste Stoppersocken für alle mit.',
+        'Bitte erscheine ca. 10 Minuten vor Slot-Beginn.',
+        'Kostenlose Stornierung bis 24 Stunden vor dem Termin möglich.',
+      ];
+      let address = 'Friedrichstraße 123, 10117 Berlin';
+      let contactNote = 'Fragen? Schreib uns auf WhatsApp oder antworte auf diese E-Mail.';
+      let footerNote = '© 2026 Haven Kids Café · Friedrichstraße 123, 10117 Berlin · hallo@havenkidscafe.de';
+      let showCancellationLink = true;
+      let showPriceDetails = true;
+      let cardTheme = 'warm';
+
+      try {
+        const { data: dbSettings } = await supabase.from('business_settings').select('key, value');
+        if (dbSettings && Array.isArray(dbSettings)) {
+          const map = new Map<string, any>();
+          dbSettings.forEach((item) => {
+            try {
+              map.set(item.key, JSON.parse(item.value));
+            } catch {
+              map.set(item.key, item.value);
+            }
+          });
+          if (map.get('email_header_color')) headerColor = map.get('email_header_color');
+          if (map.get('email_header_tagline')) headerTagline = map.get('email_header_tagline');
+          if (map.get('email_logo_url')) logoUrl = map.get('email_logo_url');
+          else if (map.get('logo_url')) logoUrl = map.get('logo_url');
+          if (map.get('email_show_logo') !== undefined) showLogo = Boolean(map.get('email_show_logo'));
+          if (map.get('email_greeting_text')) greetingText = map.get('email_greeting_text');
+          if (Array.isArray(map.get('email_visit_guidelines')) && map.get('email_visit_guidelines').length > 0) {
+            visitGuidelines = map.get('email_visit_guidelines');
+          }
+          if (map.get('address')) address = map.get('address');
+          if (map.get('email_contact_note')) contactNote = map.get('email_contact_note');
+          if (map.get('email_footer_note')) footerNote = map.get('email_footer_note');
+          if (map.get('email_show_cancellation_link') !== undefined) showCancellationLink = Boolean(map.get('email_show_cancellation_link'));
+          if (map.get('email_show_price_details') !== undefined) showPriceDetails = Boolean(map.get('email_show_price_details'));
+          if (map.get('email_card_theme')) cardTheme = map.get('email_card_theme');
+        }
+      } catch (tmplErr) {
+        console.warn('[CREATE_BOOKING_TEMPLATE_WARN] Could not fetch settings, using defaults:', tmplErr);
+      }
+
       const cancelUrl = `https://havenkidscafe.de/stornierung?token=${rpcResult.cancellation_token}`;
+      const outerBg = cardTheme === 'clean' ? '#FFFFFF' : '#FAF8F5';
+
       const emailHtml = `
 <!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #FAF8F5; margin: 0; padding: 20px; color: #2D3748; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: ${outerBg}; margin: 0; padding: 20px; color: #2D3748; }
     .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #E2E8F0; }
-    .header { background: #2D5A47; color: white; padding: 32px 24px; text-align: center; }
+    .header { background: ${headerColor}; color: white; padding: 32px 24px; text-align: center; }
     .content { padding: 32px 24px; }
-    .badge { display: inline-block; background: #E8F5E9; color: #2D5A47; font-weight: bold; padding: 6px 14px; border-radius: 20px; font-size: 14px; }
+    .badge { display: inline-block; background: ${headerColor}18; color: ${headerColor}; font-weight: bold; padding: 6px 14px; border-radius: 20px; font-size: 14px; }
     .details-box { background: #F8FAF9; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; margin: 24px 0; }
     .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #E2E8F0; font-size: 15px; }
     .row:last-child { border-bottom: none; }
@@ -467,13 +518,14 @@ serve(async (req: Request) => {
 <body>
   <div class="card">
     <div class="header">
+      ${showLogo && logoUrl ? `<div style="text-align: center; margin-bottom: 12px;"><img src="${logoUrl}" alt="Haven Kids Café" style="max-height: 48px; max-width: 180px; display: inline-block;" /></div>` : ''}
       <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Haven Kids Café</h1>
-      <p style="margin: 6px 0 0; opacity: 0.9; font-size: 14px;">Buchungsbestätigung</p>
+      <p style="margin: 6px 0 0; opacity: 0.9; font-size: 14px;">${headerTagline}</p>
     </div>
     <div class="content">
       <p style="font-size: 16px;">Liebe/r <strong>${validated.parentName}</strong>,</p>
       <p style="font-size: 15px; line-height: 1.6;">
-        vielen Dank für deine Reservierung! Dein Besuch im <strong>Haven Kids Café</strong> ist verbindlich gebucht.
+        ${greetingText}
       </p>
 
       <div style="text-align: center; margin: 24px 0;">
@@ -497,34 +549,38 @@ serve(async (req: Request) => {
           <span class="label">Gäste:</span>
           <span class="value">${validated.childrenCount} Kind(er), ${validated.adultsCount} Begleitperson(en)</span>
         </div>
+        ${showPriceDetails ? `
         <div class="row">
           <span class="label">Gesamtbetrag:</span>
           <span class="value">${Number(rpcResult.total_price).toFixed(2)} € (Zahlung vor Ort)</span>
         </div>
+        ` : ''}
       </div>
 
+      ${visitGuidelines.length > 0 ? `
       <div style="background: #FFFDF5; border: 1px solid #FEF08A; border-radius: 8px; padding: 16px; margin: 20px 0; font-size: 14px;">
         <strong>Wichtige Hinweise für deinen Besuch:</strong>
         <ul style="margin: 8px 0 0; padding-left: 20px; line-height: 1.5;">
-          <li>Bitte bringe rutschfeste Stoppersocken für alle mit.</li>
-          <li>Bitte erscheine ca. 10 Minuten vor Slot-Beginn.</li>
-          <li>Kostenlose Stornierung bis 24 Stunden vor dem Termin möglich.</li>
+          ${visitGuidelines.map(g => `<li>${g}</li>`).join('')}
         </ul>
       </div>
+      ` : ''}
 
       <p style="font-size: 14px; color: #4A5568; line-height: 1.5;">
-        <strong>Adresse:</strong> Friedrichstraße 123, 10117 Berlin<br/>
-        <strong>Fragen?</strong> Schreib uns auf WhatsApp oder antworte auf diese E-Mail.
+        <strong>Adresse:</strong> ${address}<br/>
+        ${contactNote}
       </p>
 
+      ${showCancellationLink ? `
       <div style="text-align: center; margin-top: 24px;">
         <a href="${cancelUrl}" class="btn-cancel">
           Pläne geändert? Hier mit deinem persönlichen Stornierungs-Token stornieren
         </a>
       </div>
+      ` : ''}
     </div>
     <div class="footer">
-      © 2026 Haven Kids Café · Friedrichstraße 123, 10117 Berlin · hallo@havenkidscafe.de
+      ${footerNote}
     </div>
   </div>
 </body>

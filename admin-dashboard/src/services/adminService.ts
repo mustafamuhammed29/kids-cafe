@@ -55,6 +55,23 @@ export const DEFAULT_ADMIN_SETTINGS: AdminBusinessSettings = {
   cancellationNotice: 'Kostenfreie Online-Stornierung bis zu 2 Stunden vor Beginn für Standard-Termine. Für Kindergeburtstage und Gruppenfeiern gilt eine Frist von mindestens 48 Stunden.',
   houseRulesNotice: '1. Sockenpflicht im gesamten Spielbereich (rutschfeste Socken empfohlen).\n2. Speisen & Getränke dürfen ausschließlich im Cafébereich verzehrt werden.\n3. Keine Kinderbetreuung: Die gesetzliche Aufsichtspflicht (§ 832 BGB) verbleibt stets bei den Begleitpersonen.\n4. Kindern mit ansteckenden Infektionskrankheiten ist der Zutritt zum Schutz anderer untersagt.',
   termsCustomText: '',
+
+  // E-Mail Template Defaults
+  emailHeaderColor: '#2D5A47',
+  emailHeaderTagline: 'Buchungsbestätigung & Besuchsinformationen',
+  emailLogoUrl: '',
+  emailShowLogo: true,
+  emailGreetingText: 'vielen Dank für deine Reservierung! Dein Besuch im Haven Kids Café ist verbindlich gebucht.',
+  emailVisitGuidelines: [
+    'Bitte bringe rutschfeste Stoppersocken für alle mit.',
+    'Bitte erscheine ca. 10 Minuten vor Slot-Beginn.',
+    'Kostenlose Stornierung bis 24 Stunden vor dem Termin möglich.'
+  ],
+  emailContactNote: 'Fragen? Schreib uns auf WhatsApp oder antworte auf diese E-Mail.',
+  emailFooterNote: 'Wir freuen uns auf deinen Besuch! · Haven Kids Café Berlin',
+  emailShowCancellationLink: true,
+  emailShowPriceDetails: true,
+  emailCardTheme: 'warm',
 };
 
 /**
@@ -331,6 +348,19 @@ export async function fetchBusinessSettings(): Promise<AdminBusinessSettings> {
       cancellationNotice: map.get('cancellation_notice') ?? DEFAULT_ADMIN_SETTINGS.cancellationNotice,
       houseRulesNotice: map.get('house_rules_notice') ?? DEFAULT_ADMIN_SETTINGS.houseRulesNotice,
       termsCustomText: map.get('terms_custom_text') ?? DEFAULT_ADMIN_SETTINGS.termsCustomText,
+
+      // E-Mail Template Settings
+      emailHeaderColor: map.get('email_header_color') ?? DEFAULT_ADMIN_SETTINGS.emailHeaderColor,
+      emailHeaderTagline: map.get('email_header_tagline') ?? DEFAULT_ADMIN_SETTINGS.emailHeaderTagline,
+      emailLogoUrl: map.get('email_logo_url') ?? DEFAULT_ADMIN_SETTINGS.emailLogoUrl,
+      emailShowLogo: map.get('email_show_logo') !== undefined ? Boolean(map.get('email_show_logo')) : DEFAULT_ADMIN_SETTINGS.emailShowLogo,
+      emailGreetingText: map.get('email_greeting_text') ?? DEFAULT_ADMIN_SETTINGS.emailGreetingText,
+      emailVisitGuidelines: Array.isArray(map.get('email_visit_guidelines')) ? map.get('email_visit_guidelines') : DEFAULT_ADMIN_SETTINGS.emailVisitGuidelines,
+      emailContactNote: map.get('email_contact_note') ?? DEFAULT_ADMIN_SETTINGS.emailContactNote,
+      emailFooterNote: map.get('email_footer_note') ?? DEFAULT_ADMIN_SETTINGS.emailFooterNote,
+      emailShowCancellationLink: map.get('email_show_cancellation_link') !== undefined ? Boolean(map.get('email_show_cancellation_link')) : DEFAULT_ADMIN_SETTINGS.emailShowCancellationLink,
+      emailShowPriceDetails: map.get('email_show_price_details') !== undefined ? Boolean(map.get('email_show_price_details')) : DEFAULT_ADMIN_SETTINGS.emailShowPriceDetails,
+      emailCardTheme: (map.get('email_card_theme') as 'warm' | 'clean') ?? DEFAULT_ADMIN_SETTINGS.emailCardTheme,
     };
   } catch (err) {
     console.error('Error fetching business settings:', err);
@@ -471,6 +501,41 @@ export async function saveBusinessSettings(
       upserts.push({ key: 'terms_custom_text', value: JSON.stringify(settings.termsCustomText), is_public: true });
     }
 
+    // E-Mail Template Upserts
+    if (settings.emailHeaderColor !== undefined) {
+      upserts.push({ key: 'email_header_color', value: JSON.stringify(settings.emailHeaderColor), is_public: true });
+    }
+    if (settings.emailHeaderTagline !== undefined) {
+      upserts.push({ key: 'email_header_tagline', value: JSON.stringify(settings.emailHeaderTagline), is_public: true });
+    }
+    if (settings.emailLogoUrl !== undefined) {
+      upserts.push({ key: 'email_logo_url', value: JSON.stringify(settings.emailLogoUrl), is_public: true });
+    }
+    if (settings.emailShowLogo !== undefined) {
+      upserts.push({ key: 'email_show_logo', value: JSON.stringify(settings.emailShowLogo), is_public: true });
+    }
+    if (settings.emailGreetingText !== undefined) {
+      upserts.push({ key: 'email_greeting_text', value: JSON.stringify(settings.emailGreetingText), is_public: true });
+    }
+    if (settings.emailVisitGuidelines !== undefined) {
+      upserts.push({ key: 'email_visit_guidelines', value: JSON.stringify(settings.emailVisitGuidelines), is_public: true });
+    }
+    if (settings.emailContactNote !== undefined) {
+      upserts.push({ key: 'email_contact_note', value: JSON.stringify(settings.emailContactNote), is_public: true });
+    }
+    if (settings.emailFooterNote !== undefined) {
+      upserts.push({ key: 'email_footer_note', value: JSON.stringify(settings.emailFooterNote), is_public: true });
+    }
+    if (settings.emailShowCancellationLink !== undefined) {
+      upserts.push({ key: 'email_show_cancellation_link', value: JSON.stringify(settings.emailShowCancellationLink), is_public: true });
+    }
+    if (settings.emailShowPriceDetails !== undefined) {
+      upserts.push({ key: 'email_show_price_details', value: JSON.stringify(settings.emailShowPriceDetails), is_public: true });
+    }
+    if (settings.emailCardTheme !== undefined) {
+      upserts.push({ key: 'email_card_theme', value: JSON.stringify(settings.emailCardTheme), is_public: true });
+    }
+
     for (const item of upserts) {
       const { error } = await supabase
         .from('business_settings')
@@ -484,6 +549,64 @@ export async function saveBusinessSettings(
     return { success: true };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : 'Unerwarteter Fehler beim Speichern' };
+  }
+}
+
+/**
+ * Send Live Test Confirmation Email
+ * Calls Edge Function send-booking-confirmation to send a real preview email to the admin
+ */
+export async function sendLiveTestBookingEmail(
+  targetEmail: string,
+  customSettings?: Partial<AdminBusinessSettings>
+): Promise<{ success: boolean; resendId?: string; error?: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-booking-confirmation', {
+      body: {
+        record: {
+          reference_code: `TEST-HKC-${Math.floor(1000 + Math.random() * 9000)}`,
+          cancellation_token: 'demo-cancel-token-preview',
+          customer_name: customSettings?.ownerName || 'Mustafa Muhammed',
+          customer_email: targetEmail,
+          customer_phone: customSettings?.phone || '+49 30 12345678',
+          date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+          time_slot: '10:00 - 12:00',
+          service_name: 'Einzelbesuch & Freies Spiel',
+          num_children: 1,
+          num_adults: 1,
+          total_price: 14.00,
+        },
+        templateOverride: customSettings ? {
+          headerColor: customSettings.emailHeaderColor,
+          headerTagline: customSettings.emailHeaderTagline,
+          logoUrl: customSettings.emailLogoUrl || customSettings.logoUrl,
+          showLogo: customSettings.emailShowLogo,
+          greetingText: customSettings.emailGreetingText,
+          visitGuidelines: customSettings.emailVisitGuidelines,
+          contactNote: customSettings.emailContactNote,
+          footerNote: customSettings.emailFooterNote,
+          showCancellationLink: customSettings.emailShowCancellationLink,
+          showPriceDetails: customSettings.emailShowPriceDetails,
+          cardTheme: customSettings.emailCardTheme,
+        } : undefined,
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    if (data && data.success && data.resendData?.id) {
+      return { success: true, resendId: data.resendData.id };
+    }
+
+    if (data && data.resendData?.message) {
+      return { success: false, error: data.resendData.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Verbindungsfehler beim E-Mail-Test' };
   }
 }
 

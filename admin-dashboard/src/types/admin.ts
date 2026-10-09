@@ -85,6 +85,19 @@ export interface AdminBusinessSettings {
   cancellationNotice?: string;
   houseRulesNotice?: string;
   termsCustomText?: string;
+
+  // E-Mail Template & Branding Settings
+  emailHeaderColor?: string;
+  emailHeaderTagline?: string;
+  emailLogoUrl?: string;
+  emailShowLogo?: boolean;
+  emailGreetingText?: string;
+  emailVisitGuidelines?: string[];
+  emailContactNote?: string;
+  emailFooterNote?: string;
+  emailShowCancellationLink?: boolean;
+  emailShowPriceDetails?: boolean;
+  emailCardTheme?: 'warm' | 'clean';
 }
 
 export interface AdminPackage {

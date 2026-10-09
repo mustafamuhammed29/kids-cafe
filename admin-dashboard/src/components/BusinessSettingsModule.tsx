@@ -5,6 +5,7 @@ import {
   saveBusinessSettings,
   uploadBrandingAsset,
   validateSafeUrl,
+  sendLiveTestBookingEmail,
   DEFAULT_ADMIN_SETTINGS,
 } from '../services/adminService';
 import {
@@ -34,14 +35,28 @@ import {
   Eye,
   RefreshCw,
   Search,
+  Smartphone,
+  Monitor,
+  Send,
+  Palette,
+  Sliders,
 } from 'lucide-react';
 
 interface BusinessSettingsModuleProps {
   currentRole: StaffRole;
 }
 
-type SettingsTab = 'branding' | 'legal' | 'contact' | 'hours' | 'seo';
+type SettingsTab = 'branding' | 'email' | 'legal' | 'contact' | 'hours' | 'seo';
 type LegalSubTab = 'impressum' | 'datenschutz' | 'agb';
+
+const EMAIL_COLOR_PRESETS = [
+  { name: 'Haven Forest', color: '#2D5A47', desc: 'Klassisches Natur-Grün' },
+  { name: 'Emerald Luxury', color: '#1B4D3E', desc: 'Dunkler Edelstein-Ton' },
+  { name: 'Warm Caramel', color: '#854D0E', desc: 'Warmer Honig-Holzton' },
+  { name: 'Midnight Slate', color: '#0F172A', desc: 'Modernes Dunkelblau' },
+  { name: 'Royal Velvet', color: '#831843', desc: 'Eleganter Beeren-Ton' },
+  { name: 'Ocean Deep', color: '#0369A1', desc: 'Frisches Ozeanblau' },
+];
 
 export const BusinessSettingsModule: React.FC<BusinessSettingsModuleProps> = ({ currentRole }) => {
   const isOwner = currentRole === 'owner';
@@ -57,6 +72,13 @@ export const BusinessSettingsModule: React.FC<BusinessSettingsModuleProps> = ({ 
   // Upload States
   const [uploadingTarget, setUploadingTarget] = useState<'logo' | 'favicon' | 'ogImage' | null>(null);
   const [logoPreviewBg, setLogoPreviewBg] = useState<'dark' | 'light'>('dark');
+
+  // Email Template State
+  const [emailPreviewMode, setEmailPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailRecipient, setTestEmailRecipient] = useState('jansatech.alsafi@gmail.com');
+  const [testEmailFeedback, setTestEmailFeedback] = useState<{ success: boolean; text: string } | null>(null);
+  const [newGuidelineInput, setNewGuidelineInput] = useState('');
 
   // File Input Refs
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -100,6 +122,54 @@ export const BusinessSettingsModule: React.FC<BusinessSettingsModuleProps> = ({ 
       ...settings,
       openingHours: settings.openingHours.filter((_, idx) => idx !== index),
     });
+  };
+
+  const handleAddGuideline = () => {
+    if (!newGuidelineInput.trim()) return;
+    const currentList = settings.emailVisitGuidelines || [];
+    setSettings({
+      ...settings,
+      emailVisitGuidelines: [...currentList, newGuidelineInput.trim()],
+    });
+    setNewGuidelineInput('');
+  };
+
+  const handleRemoveGuideline = (index: number) => {
+    const currentList = settings.emailVisitGuidelines || [];
+    setSettings({
+      ...settings,
+      emailVisitGuidelines: currentList.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailRecipient || !testEmailRecipient.includes('@')) {
+      setTestEmailFeedback({ success: false, text: 'Bitte eine gültige E-Mail-Adresse angeben.' });
+      return;
+    }
+    setIsSendingTestEmail(true);
+    setTestEmailFeedback(null);
+    try {
+      const res = await sendLiveTestBookingEmail(testEmailRecipient, settings);
+      if (res.success) {
+        setTestEmailFeedback({
+          success: true,
+          text: `Echte Test-E-Mail erfolgreich versendet an ${testEmailRecipient}! Prüfe dein Postfach.`,
+        });
+      } else {
+        setTestEmailFeedback({
+          success: false,
+          text: res.error || 'Fehler beim Senden der Test-E-Mail.',
+        });
+      }
+    } catch {
+      setTestEmailFeedback({
+        success: false,
+        text: 'Verbindungsfehler beim E-Mail-Test.',
+      });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
   };
 
   // Upload handler for Logo, Favicon, OG-Image
@@ -195,6 +265,7 @@ export const BusinessSettingsModule: React.FC<BusinessSettingsModuleProps> = ({ 
 
   const tabs: Array<{ id: SettingsTab; label: string; icon: React.ElementType; badge?: string }> = [
     { id: 'branding', label: 'Logo & Branding', icon: Building2 },
+    { id: 'email', label: 'E-Mail & Vorlagen', icon: Mail, badge: 'Resend' },
     { id: 'legal', label: 'Rechtliches & Impressum', icon: Scale, badge: 'Neu' },
     { id: 'contact', label: 'Standort & Kontakt', icon: Phone },
     { id: 'hours', label: 'Öffnungszeiten & Tarife', icon: Clock },
@@ -621,6 +692,573 @@ export const BusinessSettingsModule: React.FC<BusinessSettingsModuleProps> = ({ 
                   placeholder="Kurze Zusammenfassung für den Seitenfuß..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white placeholder-slate-500 focus:border-sky-500 resize-none"
                 />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =====================================================================
+            TAB: E-MAIL DESIGN & VORLAGEN-STUDIO (RESEND)
+            ===================================================================== */}
+        {activeTab === 'email' && (
+          <div className="space-y-8 animate-fadeIn">
+            {/* 1. Studio Header Card with Resend Status */}
+            <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                  <Mail className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    E-Mail Vorlagen-Studio
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Resend Live-Aktiv
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Passe das Aussehen deiner automatischen Buchungsbestätigungen in Echtzeit an und teste das Ergebnis live.
+                  </p>
+                </div>
+              </div>
+
+              {/* Fast Test Email Sender Widget in Header */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="email"
+                  value={testEmailRecipient}
+                  onChange={(e) => setTestEmailRecipient(e.target.value)}
+                  placeholder="name@example.de"
+                  className="px-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white placeholder-slate-500 w-48 sm:w-56 focus:border-emerald-500"
+                />
+                <button
+                  type="button"
+                  disabled={isSendingTestEmail}
+                  onClick={handleSendTestEmail}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20 disabled:opacity-50"
+                  title="Jetzt echte Test-E-Mail mit aktuellem Design senden"
+                >
+                  {isSendingTestEmail ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>Test senden</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Test Email Result Banner */}
+            {testEmailFeedback && (
+              <div
+                className={`p-4 rounded-2xl text-xs flex items-center justify-between gap-3 animate-fadeIn border ${
+                  testEmailFeedback.success
+                    ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300'
+                    : 'bg-rose-950/60 border-rose-800/60 text-rose-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {testEmailFeedback.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  )}
+                  <span>{testEmailFeedback.text}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTestEmailFeedback(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* 2. Main Two-Column Studio Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* LEFT: Controls (Span 6) */}
+              <div className="lg:col-span-6 space-y-6">
+                {/* Section A: Header Farbe & Branding */}
+                <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Palette className="w-4 h-4 text-emerald-400" />
+                      1. Header-Farbe &amp; Markenidentität
+                    </h4>
+                  </div>
+
+                  {/* Preset Colors */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-2">
+                      Empfohlene Farb-Paletten:
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {EMAIL_COLOR_PRESETS.map((p) => {
+                        const isSelected = (settings.emailHeaderColor || '#2D5A47').toLowerCase() === p.color.toLowerCase();
+                        return (
+                          <button
+                            key={p.color}
+                            type="button"
+                            onClick={() => setSettings({ ...settings, emailHeaderColor: p.color })}
+                            className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2.5 cursor-pointer ${
+                              isSelected
+                                ? 'border-emerald-500 bg-slate-800/90 shadow-md ring-1 ring-emerald-500/50'
+                                : 'border-slate-800 bg-slate-950/60 hover:bg-slate-800/50'
+                            }`}
+                          >
+                            <span
+                              className="w-5 h-5 rounded-lg shrink-0 shadow-inner border border-white/20"
+                              style={{ backgroundColor: p.color }}
+                            />
+                            <div className="truncate">
+                              <div className="text-[11px] font-bold text-white truncate">{p.name}</div>
+                              <div className="text-[9px] text-slate-400 font-mono truncate">{p.color}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Custom Hex Color Picker */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                        Individueller Farbcode (HEX):
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={settings.emailHeaderColor || '#2D5A47'}
+                          onChange={(e) => setSettings({ ...settings, emailHeaderColor: e.target.value })}
+                          className="w-9 h-9 rounded-lg border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={settings.emailHeaderColor || '#2D5A47'}
+                          onChange={(e) => setSettings({ ...settings, emailHeaderColor: e.target.value })}
+                          placeholder="#2D5A47"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white font-mono focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                        Header-Untertitel / Tagline:
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.emailHeaderTagline || ''}
+                        onChange={(e) => setSettings({ ...settings, emailHeaderTagline: e.target.value })}
+                        placeholder="Buchungsbestätigung & Besuchsinformationen"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Logo in Header Toggle */}
+                  <div className="pt-2 border-t border-slate-800/80 space-y-3">
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.emailShowLogo ?? true}
+                        onChange={(e) => setSettings({ ...settings, emailShowLogo: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-700 text-emerald-600 focus:ring-emerald-500 bg-slate-950"
+                      />
+                      <span className="text-xs font-semibold text-slate-200">
+                        Café-Logo zentriert im E-Mail-Header einblenden
+                      </span>
+                    </label>
+
+                    {(settings.emailShowLogo ?? true) && (
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">
+                          Spezifische Logo-URL für E-Mails (leer lassen für Website-Logo):
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.emailLogoUrl || ''}
+                          onChange={(e) => setSettings({ ...settings, emailLogoUrl: e.target.value })}
+                          placeholder={settings.logoUrl || 'https://...'}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white font-mono focus:border-emerald-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section B: Begrüßungstext & Willkommensnachricht */}
+                <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-emerald-400" />
+                      2. Begrüßung &amp; Hauptnachricht
+                    </h4>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      Einleitungstext (nach der Anrede "Liebe/r [Kundenname]"):
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={settings.emailGreetingText || ''}
+                      onChange={(e) => setSettings({ ...settings, emailGreetingText: e.target.value })}
+                      placeholder="vielen Dank für deine Reservierung! Dein Besuch im Haven Kids Café ist verbindlich gebucht."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white placeholder-slate-500 focus:border-emerald-500 resize-none leading-relaxed"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Wird direkt unter der persönlichen Anrede des Kunden platziert.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Section C: Besuchshinweise & Regeln */}
+                <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      3. Wichtige Hinweise für den Besuch (Aufzählung)
+                    </h4>
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md">
+                      {(settings.emailVisitGuidelines || []).length} Punkte
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-400">
+                    Diese Punkte erscheinen in der gelben Infobox in der E-Mail (z. B. Sockenpflicht, Ankunft, Stornierungsfristen).
+                  </p>
+
+                  {/* Existing Guidelines List */}
+                  <div className="space-y-2">
+                    {(settings.emailVisitGuidelines || []).map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 group hover:border-slate-700 transition"
+                      >
+                        <span className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={item}
+                          onChange={(e) => {
+                            const updated = [...(settings.emailVisitGuidelines || [])];
+                            updated[idx] = e.target.value;
+                            setSettings({ ...settings, emailVisitGuidelines: updated });
+                          }}
+                          className="w-full bg-transparent text-xs text-white border-0 focus:ring-0 p-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveGuideline(idx)}
+                          className="text-slate-500 hover:text-rose-400 p-1 rounded-lg transition"
+                          title="Hinweis löschen"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add New Guideline Input */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      type="text"
+                      value={newGuidelineInput}
+                      onChange={(e) => setNewGuidelineInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddGuideline();
+                        }
+                      }}
+                      placeholder="Neuen Hinweis hinzufügen (z. B. Parkplätze im Innenhof)..."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white placeholder-slate-500 focus:border-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddGuideline}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Hinzufügen</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section D: Kontaktzeile & Footer */}
+                <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-emerald-400" />
+                      4. Kontaktzeile &amp; Fußbereich
+                    </h4>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      Fragen &amp; WhatsApp-Hinweiszeile:
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.emailContactNote || ''}
+                      onChange={(e) => setSettings({ ...settings, emailContactNote: e.target.value })}
+                      placeholder="Fragen? Schreib uns auf WhatsApp oder antworte auf diese E-Mail."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      Fußzeilen-Gruß &amp; Hinweis:
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.emailFooterNote || ''}
+                      onChange={(e) => setSettings({ ...settings, emailFooterNote: e.target.value })}
+                      placeholder="Wir freuen uns auf deinen Besuch! · Haven Kids Café Berlin"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Section E: Schalter & Darstellungsoptionen */}
+                <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-emerald-400" />
+                      5. Funktions-Optionen
+                    </h4>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition">
+                      <div>
+                        <div className="text-xs font-semibold text-white">Gesamtbetrag &amp; Zahlungsart anzeigen</div>
+                        <div className="text-[11px] text-slate-400">Zeigt z. B. "14.00 € (Zahlung vor Ort)" in der Detailtabelle</div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={settings.emailShowPriceDetails ?? true}
+                        onChange={(e) => setSettings({ ...settings, emailShowPriceDetails: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-700 text-emerald-600 focus:ring-emerald-500 bg-slate-950"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition">
+                      <div>
+                        <div className="text-xs font-semibold text-white">Stornierungslink mit Token anzeigen</div>
+                        <div className="text-[11px] text-slate-400">Ermöglicht dem Kunden die 1-Klick-Stornierung gemäß Fristen</div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={settings.emailShowCancellationLink ?? true}
+                        onChange={(e) => setSettings({ ...settings, emailShowCancellationLink: e.target.checked })}
+                        className="w-4 h-4 rounded border-slate-700 text-emerald-600 focus:ring-emerald-500 bg-slate-950"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT: Live Interactive Preview (Span 6, Sticky) */}
+              <div className="lg:col-span-6 space-y-4 lg:sticky lg:top-6">
+                {/* Preview Toolbar */}
+                <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      Live-Vorschau in Echtzeit
+                    </span>
+                  </div>
+
+                  <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setEmailPreviewMode('mobile')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        emailPreviewMode === 'mobile'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Smartphone</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEmailPreviewMode('desktop')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        emailPreviewMode === 'desktop'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Monitor className="w-3.5 h-3.5" />
+                      <span>Desktop</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preview Frame */}
+                <div
+                  className={`mx-auto transition-all duration-300 ${
+                    emailPreviewMode === 'mobile'
+                      ? 'max-w-[390px] rounded-[40px] p-4 bg-slate-950 border-[6px] border-slate-800 shadow-2xl ring-1 ring-slate-700/50'
+                      : 'w-full rounded-2xl p-5 bg-slate-950 border border-slate-800 shadow-xl'
+                  }`}
+                >
+                  {/* Smartphone Top Notch/Speaker (Mobile Only) */}
+                  {emailPreviewMode === 'mobile' && (
+                    <div className="w-24 h-4 bg-slate-800 rounded-full mx-auto mb-3 flex items-center justify-center">
+                      <div className="w-10 h-1 bg-slate-700 rounded-full" />
+                    </div>
+                  )}
+
+                  {/* Simulated Email Envelope Header */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-t-xl px-4 py-2.5 text-[11px] text-slate-300 font-sans border-b-0 flex items-center justify-between">
+                    <div className="truncate">
+                      <span className="text-slate-500">Von:</span>{' '}
+                      <strong className="text-white">{settings.name || 'Haven Kids Café'}</strong> &lt;buchung@havenkidscafe.de&gt;
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+                      Heute
+                    </span>
+                  </div>
+
+                  {/* Rendered Email Body Container */}
+                  <div
+                    className="overflow-y-auto max-h-[620px] rounded-b-xl border border-slate-200/20 text-slate-800 text-left font-sans"
+                    style={{ backgroundColor: settings.emailCardTheme === 'clean' ? '#FFFFFF' : '#FAF8F5' }}
+                  >
+                    {/* The Email Card */}
+                    <div className="bg-white rounded-b-xl overflow-hidden shadow-sm">
+                      {/* Email Header Banner */}
+                      <div
+                        className="text-white p-6 sm:p-7 text-center transition-colors duration-300"
+                        style={{ backgroundColor: settings.emailHeaderColor || '#2D5A47' }}
+                      >
+                        {(settings.emailShowLogo ?? true) && (
+                          <div className="mb-2 flex justify-center">
+                            {settings.emailLogoUrl || settings.logoUrl ? (
+                              <img
+                                src={settings.emailLogoUrl || settings.logoUrl}
+                                alt="Haven Kids Café"
+                                className="h-10 max-w-[160px] object-contain drop-shadow"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center font-bold text-white text-base">
+                                HKC
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <h2 className="text-xl font-bold tracking-tight text-white m-0">
+                          {settings.name || 'Haven Kids Café'}
+                        </h2>
+                        <p className="text-xs text-white/90 font-medium mt-1 m-0">
+                          {settings.emailHeaderTagline || 'Buchungsbestätigung & Besuchsinformationen'}
+                        </p>
+                      </div>
+
+                      {/* Email Main Content */}
+                      <div className="p-5 sm:p-6 space-y-4 text-xs leading-relaxed text-slate-700">
+                        <p className="text-sm text-slate-900 m-0">
+                          Liebe/r <strong>Mustafa Testing</strong>,
+                        </p>
+                        <p className="m-0 text-slate-600">
+                          {settings.emailGreetingText ||
+                            'vielen Dank für deine Reservierung! Dein Besuch im Haven Kids Café ist verbindlich gebucht.'}
+                        </p>
+
+                        {/* Badge */}
+                        <div className="text-center py-1">
+                          <span
+                            className="inline-block px-3.5 py-1.5 rounded-full font-bold text-xs"
+                            style={{
+                              backgroundColor: `${settings.emailHeaderColor || '#2D5A47'}18`,
+                              color: settings.emailHeaderColor || '#2D5A47',
+                            }}
+                          >
+                            Buchungscode: HKC-20261021-71F9
+                          </span>
+                        </div>
+
+                        {/* Booking Details Box */}
+                        <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 space-y-2">
+                          <div className="flex justify-between border-b border-dashed border-slate-200 pb-1.5">
+                            <span className="text-slate-500">Erlebnis / Service:</span>
+                            <span className="font-semibold text-slate-900">Einzelbesuch &amp; Freies Spiel</span>
+                          </div>
+                          <div className="flex justify-between border-b border-dashed border-slate-200 pb-1.5">
+                            <span className="text-slate-500">Datum:</span>
+                            <span className="font-semibold text-slate-900">2026-10-21</span>
+                          </div>
+                          <div className="flex justify-between border-b border-dashed border-slate-200 pb-1.5">
+                            <span className="text-slate-500">Zeitslot:</span>
+                            <span className="font-semibold text-slate-900">10:00 – 12:00 Uhr</span>
+                          </div>
+                          <div className="flex justify-between border-b border-dashed border-slate-200 pb-1.5">
+                            <span className="text-slate-500">Gäste:</span>
+                            <span className="font-semibold text-slate-900">1 Kind, 1 Begleitperson</span>
+                          </div>
+                          {(settings.emailShowPriceDetails ?? true) && (
+                            <div className="flex justify-between pt-0.5">
+                              <span className="text-slate-500 font-semibold">Gesamtbetrag:</span>
+                              <span className="font-bold text-slate-900">14.00 € (Zahlung vor Ort)</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Yellow Guidelines Box */}
+                        {(settings.emailVisitGuidelines || []).length > 0 && (
+                          <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3.5 space-y-1.5 text-amber-950">
+                            <strong className="block text-amber-900 font-bold text-[11px]">
+                              Wichtige Hinweise für deinen Besuch:
+                            </strong>
+                            <ul className="list-disc pl-4 space-y-1 text-[11px] text-amber-900/90">
+                              {(settings.emailVisitGuidelines || []).map((guide, gIdx) => (
+                                <li key={gIdx}>{guide}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Location & Contact Notice */}
+                        <div className="pt-2 text-[11px] text-slate-600 border-t border-slate-100 space-y-1">
+                          <div>
+                            <strong className="text-slate-800">Adresse:</strong> {settings.address || 'Friedrichstraße 123, 10117 Berlin'}
+                          </div>
+                          <div>
+                            {settings.emailContactNote ||
+                              'Fragen? Schreib uns auf WhatsApp oder antworte auf diese E-Mail.'}
+                          </div>
+                        </div>
+
+                        {/* Cancellation Link Button */}
+                        {(settings.emailShowCancellationLink ?? true) && (
+                          <div className="text-center pt-2">
+                            <span className="inline-block text-[11px] text-slate-500 underline cursor-pointer hover:text-slate-700">
+                              Pläne geändert? Hier mit deinem persönlichen Stornierungs-Token stornieren
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Email Footer */}
+                      <div className="bg-slate-50 border-t border-slate-100 p-4 text-center text-[10px] text-slate-400">
+                        {settings.emailFooterNote ||
+                          `© 2026 ${settings.name || 'Haven Kids Café'} · ${settings.address || 'Friedrichstraße 123, 10117 Berlin'} · ${settings.email || 'hallo@havenkidscafe.de'}`}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
