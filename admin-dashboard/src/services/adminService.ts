@@ -33,6 +33,19 @@ export const DEFAULT_ADMIN_SETTINGS: AdminBusinessSettings = {
     { days: 'Sonntag', time: 'Geschlossen (Ruhetag & Exklusiv-Events)' },
   ],
   saltRoomAddonPrice: 5.00,
+
+  // Legal Information Defaults (§ 5 DDG & Impressum)
+  ownerName: 'Mustafa Muhammed',
+  companyLegalName: 'Haven Kids Café Berlin',
+  legalAddress: 'Friedrichstraße 123, 10117 Berlin, Deutschland',
+  taxId: 'DE (Beantragt / in Zuteilung)',
+  taxNumber: '',
+  registerCourt: 'Amtsgericht Charlottenburg (Berlin)',
+  registerNumber: 'In Gründung / Gewerbeanmeldung vorliegend',
+  regulatoryAuthority: 'Bezirksamt Mitte von Berlin – Ordnungsamt / Gewerbeamt',
+  liabilityInsurance: 'Gewerbliche Betriebshaftpflichtversicherung mit Deckung für Kinderspielbereiche',
+  disputeResolutionNotice: 'Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.',
+  additionalLegalNotice: 'Besuch nur in Begleitung einer volljährigen Aufsichtsperson. Sockenpflicht im gesamten Spielbereich.',
 };
 
 /**
@@ -287,6 +300,19 @@ export async function fetchBusinessSettings(): Promise<AdminBusinessSettings> {
       ogImageUrl: map.get('og_image_url') ?? DEFAULT_ADMIN_SETTINGS.ogImageUrl,
       openingHours: map.get('opening_hours') ?? DEFAULT_ADMIN_SETTINGS.openingHours,
       saltRoomAddonPrice: map.get('salt_room_addon_price') ? Number(map.get('salt_room_addon_price')) : 5.00,
+
+      // Legal Information (§ 5 DDG & Impressum)
+      ownerName: map.get('owner_name') ?? DEFAULT_ADMIN_SETTINGS.ownerName,
+      companyLegalName: map.get('company_legal_name') ?? DEFAULT_ADMIN_SETTINGS.companyLegalName,
+      legalAddress: map.get('legal_address') ?? DEFAULT_ADMIN_SETTINGS.legalAddress,
+      taxId: map.get('tax_id') ?? DEFAULT_ADMIN_SETTINGS.taxId,
+      taxNumber: map.get('tax_number') ?? DEFAULT_ADMIN_SETTINGS.taxNumber,
+      registerCourt: map.get('register_court') ?? DEFAULT_ADMIN_SETTINGS.registerCourt,
+      registerNumber: map.get('register_number') ?? DEFAULT_ADMIN_SETTINGS.registerNumber,
+      regulatoryAuthority: map.get('regulatory_authority') ?? DEFAULT_ADMIN_SETTINGS.regulatoryAuthority,
+      liabilityInsurance: map.get('liability_insurance') ?? DEFAULT_ADMIN_SETTINGS.liabilityInsurance,
+      disputeResolutionNotice: map.get('dispute_resolution_notice') ?? DEFAULT_ADMIN_SETTINGS.disputeResolutionNotice,
+      additionalLegalNotice: map.get('additional_legal_notice') ?? DEFAULT_ADMIN_SETTINGS.additionalLegalNotice,
     };
   } catch (err) {
     console.error('Error fetching business settings:', err);
@@ -373,6 +399,41 @@ export async function saveBusinessSettings(
       upserts.push({ key: 'salt_room_addon_price', value: JSON.stringify(settings.saltRoomAddonPrice), is_public: true });
     }
 
+    // Legal Information Upserts
+    if (settings.ownerName !== undefined) {
+      upserts.push({ key: 'owner_name', value: JSON.stringify(settings.ownerName), is_public: true });
+    }
+    if (settings.companyLegalName !== undefined) {
+      upserts.push({ key: 'company_legal_name', value: JSON.stringify(settings.companyLegalName), is_public: true });
+    }
+    if (settings.legalAddress !== undefined) {
+      upserts.push({ key: 'legal_address', value: JSON.stringify(settings.legalAddress), is_public: true });
+    }
+    if (settings.taxId !== undefined) {
+      upserts.push({ key: 'tax_id', value: JSON.stringify(settings.taxId), is_public: true });
+    }
+    if (settings.taxNumber !== undefined) {
+      upserts.push({ key: 'tax_number', value: JSON.stringify(settings.taxNumber), is_public: true });
+    }
+    if (settings.registerCourt !== undefined) {
+      upserts.push({ key: 'register_court', value: JSON.stringify(settings.registerCourt), is_public: true });
+    }
+    if (settings.registerNumber !== undefined) {
+      upserts.push({ key: 'register_number', value: JSON.stringify(settings.registerNumber), is_public: true });
+    }
+    if (settings.regulatoryAuthority !== undefined) {
+      upserts.push({ key: 'regulatory_authority', value: JSON.stringify(settings.regulatoryAuthority), is_public: true });
+    }
+    if (settings.liabilityInsurance !== undefined) {
+      upserts.push({ key: 'liability_insurance', value: JSON.stringify(settings.liabilityInsurance), is_public: true });
+    }
+    if (settings.disputeResolutionNotice !== undefined) {
+      upserts.push({ key: 'dispute_resolution_notice', value: JSON.stringify(settings.disputeResolutionNotice), is_public: true });
+    }
+    if (settings.additionalLegalNotice !== undefined) {
+      upserts.push({ key: 'additional_legal_notice', value: JSON.stringify(settings.additionalLegalNotice), is_public: true });
+    }
+
     for (const item of upserts) {
       const { error } = await supabase
         .from('business_settings')
@@ -387,6 +448,72 @@ export async function saveBusinessSettings(
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : 'Unerwarteter Fehler beim Speichern' };
   }
+}
+
+/**
+ * Upload Branding Asset (Logo, Favicon, Social Share Banner)
+ * Supports SVG, PNG, WebP, JPG, ICO with CDN storage & local preview fallback
+ */
+export async function uploadBrandingAsset(
+  file: File
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  if (!file) {
+    return { success: false, error: 'Keine Datei ausgewählt.' };
+  }
+
+  // 1. Max size: 5MB
+  if (file.size > 5 * 1024 * 1024) {
+    return { success: false, error: 'Die Datei ist größer als 5 MB.' };
+  }
+
+  // 2. Validate extension
+  const rawName = file.name;
+  const parts = rawName.split('.');
+  const ext = parts.pop()?.toLowerCase() || '';
+  const allowed = ['svg', 'png', 'webp', 'jpg', 'jpeg', 'ico'];
+  if (!allowed.includes(ext)) {
+    return {
+      success: false,
+      error: `Dateiformat ".${ext}" wird nicht unterstützt. Erlaubt sind: SVG, PNG, WEBP, JPG, ICO.`,
+    };
+  }
+
+  // If local development / no Supabase
+  if (!isSupabaseConfigured) {
+    const objectUrl = URL.createObjectURL(file);
+    return { success: true, url: objectUrl };
+  }
+
+  // 3. Upload to Cloudinary CDN
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'mo5nsuan';
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'myproject';
+
+  if (cloudName && uploadPreset) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+      formData.append('folder', 'haven_kids_branding');
+
+      const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (cloudRes.ok) {
+        const cloudData = await cloudRes.json();
+        return {
+          success: true,
+          url: cloudData.secure_url || cloudData.url,
+        };
+      }
+    } catch (err) {
+      console.warn('Cloudinary branding upload error, falling back to local object URL:', err);
+    }
+  }
+
+  const fallbackUrl = URL.createObjectURL(file);
+  return { success: true, url: fallbackUrl };
 }
 
 // ==============================================================================

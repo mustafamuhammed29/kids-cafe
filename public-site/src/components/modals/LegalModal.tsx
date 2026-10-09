@@ -2,6 +2,7 @@ import React, { useState, useId, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Shield, FileText, Scale } from 'lucide-react';
 import { BUSINESS_INFO } from '../../data/mockData';
+import { getBusinessSettings, type BusinessSettings } from '../../services/contentService';
 
 interface LegalModalProps {
   isOpen: boolean;
@@ -15,7 +16,12 @@ export const LegalModal: React.FC<LegalModalProps> = ({
   initialTab = 'impressum',
 }) => {
   const [activeTab, setActiveTab] = useState<'impressum' | 'datenschutz' | 'agb'>(initialTab);
+  const [settings, setSettings] = useState<BusinessSettings | null>(null);
   const titleId = useId();
+
+  useEffect(() => {
+    getBusinessSettings().then((data) => setSettings(data));
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -113,24 +119,52 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                 Angaben gemäß § 5 DDG
               </h3>
               <p>
-                <strong>{BUSINESS_INFO.name}</strong><br />
-                Inhaber: {BUSINESS_INFO.owner}<br />
-                {BUSINESS_INFO.address}<br />
+                <strong>{settings?.companyLegalName || settings?.name || BUSINESS_INFO.name}</strong><br />
+                Inhaber / Vertretungsberechtigt: {settings?.ownerName || BUSINESS_INFO.owner}<br />
+                {settings?.legalAddress || settings?.address || BUSINESS_INFO.address}<br />
                 Deutschland
               </p>
               <p>
                 <strong>Kontakt:</strong><br />
-                Telefon: {BUSINESS_INFO.phone}<br />
-                E-Mail: {BUSINESS_INFO.email}
+                Telefon: {settings?.phone || BUSINESS_INFO.phone}<br />
+                E-Mail: {settings?.email || BUSINESS_INFO.email}
               </p>
               <p>
                 <strong>Umsatzsteuer-Identifikationsnummer (USt-IdNr.):</strong><br />
-                DE (Beantragt / in Zuteilung)
+                {settings?.taxId || 'DE (Beantragt / in Zuteilung)'}
+                {settings?.taxNumber && <><br /><span className="text-xs text-gray-500">Steuernummer: {settings.taxNumber}</span></>}
               </p>
+              {(settings?.registerCourt || settings?.registerNumber) && (
+                <p>
+                  <strong>Registereintrag:</strong><br />
+                  {settings.registerCourt && <>{settings.registerCourt}<br /></>}
+                  {settings.registerNumber && <>{settings.registerNumber}</>}
+                </p>
+              )}
+              {settings?.regulatoryAuthority && (
+                <p>
+                  <strong>Aufsichtsbehörde:</strong><br />
+                  {settings.regulatoryAuthority}
+                </p>
+              )}
+              {settings?.liabilityInsurance && (
+                <p>
+                  <strong>Berufshaftpflichtversicherung:</strong><br />
+                  {settings.liabilityInsurance}
+                </p>
+              )}
               <h4 className="font-bold text-gray-900 mt-4">Verbraucherstreitbeilegung:</h4>
               <p className="text-xs text-gray-500">
-                Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+                {settings?.disputeResolutionNotice || (
+                  'Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.'
+                )}
               </p>
+              {settings?.additionalLegalNotice && (
+                <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                  <strong className="block font-bold mb-0.5">Besondere Hinweise:</strong>
+                  <span>{settings.additionalLegalNotice}</span>
+                </div>
+              )}
             </div>
           )}
 

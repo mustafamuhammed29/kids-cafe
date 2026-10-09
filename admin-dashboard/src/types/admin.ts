@@ -63,6 +63,19 @@ export interface AdminBusinessSettings {
   ogImageUrl?: string;
   openingHours: OpeningHourItem[];
   saltRoomAddonPrice: number;
+
+  // Legal Information (Impressum § 5 DDG & Compliance)
+  ownerName?: string;
+  companyLegalName?: string;
+  legalAddress?: string;
+  taxId?: string;
+  taxNumber?: string;
+  registerCourt?: string;
+  registerNumber?: string;
+  regulatoryAuthority?: string;
+  liabilityInsurance?: string;
+  disputeResolutionNotice?: string;
+  additionalLegalNotice?: string;
 }
 
 export interface AdminPackage {

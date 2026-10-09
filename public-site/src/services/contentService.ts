@@ -19,6 +19,19 @@ export interface BusinessSettings {
   seoDescription?: string;
   ogImageUrl?: string;
   openingHours: Array<{ days: string; time: string }>;
+
+  // Legal Information (§ 5 DDG & Impressum)
+  ownerName?: string;
+  companyLegalName?: string;
+  legalAddress?: string;
+  taxId?: string;
+  taxNumber?: string;
+  registerCourt?: string;
+  registerNumber?: string;
+  regulatoryAuthority?: string;
+  liabilityInsurance?: string;
+  disputeResolutionNotice?: string;
+  additionalLegalNotice?: string;
 }
 
 export interface SiteAnnouncement {
@@ -114,6 +127,19 @@ const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   seoDescription: 'Sicherer Spielbereich für Kinder 0-8 Jahre. Entspannung für Eltern mit Barista-Kaffee & sanftem Salzraum in Berlin. Jetzt Termin buchen!',
   ogImageUrl: '/assets/spielbereich.jpg',
   openingHours: BUSINESS_INFO.hours,
+
+  // Legal Defaults
+  ownerName: 'Mustafa Muhammed',
+  companyLegalName: 'Haven Kids Café Berlin',
+  legalAddress: BUSINESS_INFO.address,
+  taxId: 'DE (Beantragt / in Zuteilung)',
+  taxNumber: '',
+  registerCourt: 'Amtsgericht Charlottenburg (Berlin)',
+  registerNumber: 'In Gründung / Gewerbeanmeldung vorliegend',
+  regulatoryAuthority: 'Bezirksamt Mitte von Berlin – Ordnungsamt / Gewerbeamt',
+  liabilityInsurance: 'Gewerbliche Betriebshaftpflichtversicherung mit Deckung für Kinderspielbereiche',
+  disputeResolutionNotice: 'Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.',
+  additionalLegalNotice: '',
 };
 
 /**
@@ -200,6 +226,19 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
       seoDescription: (map.get('seo_description') as string) || DEFAULT_BUSINESS_SETTINGS.seoDescription,
       ogImageUrl: sanitizeSafeUrl(map.get('og_image_url') as string) || DEFAULT_BUSINESS_SETTINGS.ogImageUrl,
       openingHours: (map.get('opening_hours') as Array<{ days: string; time: string }>) || DEFAULT_BUSINESS_SETTINGS.openingHours,
+
+      // Legal Fields Mapping
+      ownerName: (map.get('owner_name') as string) || DEFAULT_BUSINESS_SETTINGS.ownerName,
+      companyLegalName: (map.get('company_legal_name') as string) || DEFAULT_BUSINESS_SETTINGS.companyLegalName,
+      legalAddress: (map.get('legal_address') as string) || DEFAULT_BUSINESS_SETTINGS.legalAddress,
+      taxId: (map.get('tax_id') as string) || DEFAULT_BUSINESS_SETTINGS.taxId,
+      taxNumber: (map.get('tax_number') as string) || DEFAULT_BUSINESS_SETTINGS.taxNumber,
+      registerCourt: (map.get('register_court') as string) || DEFAULT_BUSINESS_SETTINGS.registerCourt,
+      registerNumber: (map.get('register_number') as string) || DEFAULT_BUSINESS_SETTINGS.registerNumber,
+      regulatoryAuthority: (map.get('regulatory_authority') as string) || DEFAULT_BUSINESS_SETTINGS.regulatoryAuthority,
+      liabilityInsurance: (map.get('liability_insurance') as string) || DEFAULT_BUSINESS_SETTINGS.liabilityInsurance,
+      disputeResolutionNotice: (map.get('dispute_resolution_notice') as string) || DEFAULT_BUSINESS_SETTINGS.disputeResolutionNotice,
+      additionalLegalNotice: (map.get('additional_legal_notice') as string) || DEFAULT_BUSINESS_SETTINGS.additionalLegalNotice,
     };
   } catch {
     return DEFAULT_BUSINESS_SETTINGS;
