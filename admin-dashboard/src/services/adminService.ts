@@ -46,6 +46,15 @@ export const DEFAULT_ADMIN_SETTINGS: AdminBusinessSettings = {
   liabilityInsurance: 'Gewerbliche Betriebshaftpflichtversicherung mit Deckung für Kinderspielbereiche',
   disputeResolutionNotice: 'Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.',
   additionalLegalNotice: 'Besuch nur in Begleitung einer volljährigen Aufsichtsperson. Sockenpflicht im gesamten Spielbereich.',
+
+  // Legal Information Defaults (Datenschutzerklärung DSGVO)
+  privacyDpoContact: '',
+  privacyCustomText: '',
+
+  // Legal Information Defaults (AGB & Besuchsregeln)
+  cancellationNotice: 'Kostenfreie Online-Stornierung bis zu 2 Stunden vor Beginn für Standard-Termine. Für Kindergeburtstage und Gruppenfeiern gilt eine Frist von mindestens 48 Stunden.',
+  houseRulesNotice: '1. Sockenpflicht im gesamten Spielbereich (rutschfeste Socken empfohlen).\n2. Speisen & Getränke dürfen ausschließlich im Cafébereich verzehrt werden.\n3. Keine Kinderbetreuung: Die gesetzliche Aufsichtspflicht (§ 832 BGB) verbleibt stets bei den Begleitpersonen.\n4. Kindern mit ansteckenden Infektionskrankheiten ist der Zutritt zum Schutz anderer untersagt.',
+  termsCustomText: '',
 };
 
 /**
@@ -313,6 +322,15 @@ export async function fetchBusinessSettings(): Promise<AdminBusinessSettings> {
       liabilityInsurance: map.get('liability_insurance') ?? DEFAULT_ADMIN_SETTINGS.liabilityInsurance,
       disputeResolutionNotice: map.get('dispute_resolution_notice') ?? DEFAULT_ADMIN_SETTINGS.disputeResolutionNotice,
       additionalLegalNotice: map.get('additional_legal_notice') ?? DEFAULT_ADMIN_SETTINGS.additionalLegalNotice,
+
+      // Legal Information (Datenschutzerklärung DSGVO)
+      privacyDpoContact: map.get('privacy_dpo_contact') ?? DEFAULT_ADMIN_SETTINGS.privacyDpoContact,
+      privacyCustomText: map.get('privacy_custom_text') ?? DEFAULT_ADMIN_SETTINGS.privacyCustomText,
+
+      // Legal Information (AGB & Besuchsregeln)
+      cancellationNotice: map.get('cancellation_notice') ?? DEFAULT_ADMIN_SETTINGS.cancellationNotice,
+      houseRulesNotice: map.get('house_rules_notice') ?? DEFAULT_ADMIN_SETTINGS.houseRulesNotice,
+      termsCustomText: map.get('terms_custom_text') ?? DEFAULT_ADMIN_SETTINGS.termsCustomText,
     };
   } catch (err) {
     console.error('Error fetching business settings:', err);
@@ -432,6 +450,25 @@ export async function saveBusinessSettings(
     }
     if (settings.additionalLegalNotice !== undefined) {
       upserts.push({ key: 'additional_legal_notice', value: JSON.stringify(settings.additionalLegalNotice), is_public: true });
+    }
+
+    // Privacy Policy Upserts (DSGVO)
+    if (settings.privacyDpoContact !== undefined) {
+      upserts.push({ key: 'privacy_dpo_contact', value: JSON.stringify(settings.privacyDpoContact), is_public: true });
+    }
+    if (settings.privacyCustomText !== undefined) {
+      upserts.push({ key: 'privacy_custom_text', value: JSON.stringify(settings.privacyCustomText), is_public: true });
+    }
+
+    // Terms & Visiting Rules Upserts (AGB & Besuchsregeln)
+    if (settings.cancellationNotice !== undefined) {
+      upserts.push({ key: 'cancellation_notice', value: JSON.stringify(settings.cancellationNotice), is_public: true });
+    }
+    if (settings.houseRulesNotice !== undefined) {
+      upserts.push({ key: 'house_rules_notice', value: JSON.stringify(settings.houseRulesNotice), is_public: true });
+    }
+    if (settings.termsCustomText !== undefined) {
+      upserts.push({ key: 'terms_custom_text', value: JSON.stringify(settings.termsCustomText), is_public: true });
     }
 
     for (const item of upserts) {

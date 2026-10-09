@@ -29,6 +29,7 @@ import {
   Upload,
   Scale,
   FileText,
+  Shield,
   X,
   Eye,
   RefreshCw,
@@ -40,11 +41,13 @@ interface BusinessSettingsModuleProps {
 }
 
 type SettingsTab = 'branding' | 'legal' | 'contact' | 'hours' | 'seo';
+type LegalSubTab = 'impressum' | 'datenschutz' | 'agb';
 
 export const BusinessSettingsModule: React.FC<BusinessSettingsModuleProps> = ({ currentRole }) => {
   const isOwner = currentRole === 'owner';
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('branding');
+  const [legalSubTab, setLegalSubTab] = useState<LegalSubTab>('impressum');
   const [settings, setSettings] = useState<AdminBusinessSettings>(DEFAULT_ADMIN_SETTINGS);
   const [initialSettings, setInitialSettings] = useState<AdminBusinessSettings>(DEFAULT_ADMIN_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
@@ -624,255 +627,597 @@ export const BusinessSettingsModule: React.FC<BusinessSettingsModuleProps> = ({ 
         )}
 
         {/* =====================================================================
-            TAB 2: RECHTLICHES & IMPRESSUM (§ 5 DDG)
+            TAB 2: RECHTLICHE SEITEN & COMPLIANCE (IMPRESSUM, DATENSCHUTZ, AGB)
             ===================================================================== */}
         {activeTab === 'legal' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="bg-slate-900/90 rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl space-y-6">
-              <div className="border-b border-slate-800 pb-4">
-                <h3 className="font-bold text-base text-white flex items-center gap-2 font-heading">
-                  <Scale className="w-5 h-5 text-sky-400" />
-                  Gesetzliche Anbieterkennzeichnung &amp; Impressum (§ 5 DDG)
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Vollständige Angaben für ein abmahnsicheres Impressum, Steuernummern, Handelsregister und Aufsichtsbehörden.
-                </p>
-              </div>
+            {/* Sub-Navigation for Legal Documents (Matching screenshot buttons) */}
+            <div className="bg-slate-900/90 rounded-2xl p-2.5 border border-slate-800 shadow-xl flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setLegalSubTab('impressum')}
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  legalSubTab === 'impressum'
+                    ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Impressum (§ 5 DDG)</span>
+              </button>
 
-              {/* 1. Anbieter & Inhaber */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5" />
-                  1. Vertretungsberechtigte &amp; Rechtsform
-                </h4>
+              <button
+                type="button"
+                onClick={() => setLegalSubTab('datenschutz')}
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  legalSubTab === 'datenschutz'
+                    ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Datenschutzerklärung (DSGVO)</span>
+              </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Inhaber / Vertretungsberechtigter *
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isOwner}
-                      placeholder="z. B. Mustafa Muhammed"
-                      value={settings.ownerName || ''}
-                      onChange={(e) => setSettings({ ...settings, ownerName: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
-                    />
+              <button
+                type="button"
+                onClick={() => setLegalSubTab('agb')}
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  legalSubTab === 'agb'
+                    ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                }`}
+              >
+                <Scale className="w-4 h-4" />
+                <span>AGB &amp; Besuchsregeln</span>
+              </button>
+            </div>
+
+            {/* -------------------------------------------------------------
+                SUB-PAGE 1: IMPRESSUM (§ 5 DDG)
+                ------------------------------------------------------------- */}
+            {legalSubTab === 'impressum' && (
+              <div className="bg-slate-900/90 rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl space-y-6 animate-fadeIn">
+                <div className="border-b border-slate-800 pb-4">
+                  <h3 className="font-bold text-base text-white flex items-center gap-2 font-heading">
+                    <Scale className="w-5 h-5 text-sky-400" />
+                    Gesetzliche Anbieterkennzeichnung &amp; Impressum (§ 5 DDG)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Vollständige Angaben für ein abmahnsicheres Impressum, Steuernummern, Handelsregister und Aufsichtsbehörden.
+                  </p>
+                </div>
+
+                {/* 1. Anbieter & Inhaber */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    1. Vertretungsberechtigte &amp; Rechtsform
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Inhaber / Vertretungsberechtigter *
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="z. B. Mustafa Muhammed"
+                        value={settings.ownerName || ''}
+                        onChange={(e) => setSettings({ ...settings, ownerName: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Offizielle Firmenbezeichnung / Rechtsform *
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="z. B. Haven Kids Café Berlin (Einzelunternehmen / GmbH)"
+                        value={settings.companyLegalName || ''}
+                        onChange={(e) => setSettings({ ...settings, companyLegalName: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Rechtliche Geschäftsanschrift (für das Impressum) *
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="Friedrichstraße 123, 10117 Berlin, Deutschland"
+                        value={settings.legalAddress || settings.address}
+                        onChange={(e) => setSettings({ ...settings, legalAddress: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
+                      />
+                    </div>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Offizielle Firmenbezeichnung / Rechtsform *
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isOwner}
-                      placeholder="z. B. Haven Kids Café Berlin (Einzelunternehmen / GmbH)"
-                      value={settings.companyLegalName || ''}
-                      onChange={(e) => setSettings({ ...settings, companyLegalName: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
-                    />
+                {/* 2. Steuern & Register */}
+                <div className="pt-4 border-t border-slate-800 space-y-4">
+                  <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" />
+                    2. Steuernummern &amp; Handelsregister
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Umsatzsteuer-Identifikationsnummer (USt-IdNr.)
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="z. B. DE123456789 oder 'Beantragt / in Zuteilung'"
+                        value={settings.taxId || ''}
+                        onChange={(e) => setSettings({ ...settings, taxId: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Steuernummer (Finanzamt)
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="z. B. 30/123/45678 (optional für Impressum)"
+                        value={settings.taxNumber || ''}
+                        onChange={(e) => setSettings({ ...settings, taxNumber: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Registergericht
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="z. B. Amtsgericht Charlottenburg (Berlin)"
+                        value={settings.registerCourt || ''}
+                        onChange={(e) => setSettings({ ...settings, registerCourt: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Registernummer
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="z. B. HRB 123456 B oder 'Gewerbeanmeldung vorliegend'"
+                        value={settings.registerNumber || ''}
+                        onChange={(e) => setSettings({ ...settings, registerNumber: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-mono"
+                      />
+                    </div>
                   </div>
+                </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Rechtliche Geschäftsanschrift (für das Impressum) *
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isOwner}
-                      placeholder="Friedrichstraße 123, 10117 Berlin, Deutschland"
-                      value={settings.legalAddress || settings.address}
-                      onChange={(e) => setSettings({ ...settings, legalAddress: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
-                    />
+                {/* 3. Aufsichtsbehörden & Schlichtung */}
+                <div className="pt-4 border-t border-slate-800 space-y-4">
+                  <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    3. Aufsichtsbehörde &amp; Streitschlichtung
+                  </h4>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Zuständige Aufsichtsbehörde
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="z. B. Bezirksamt Mitte von Berlin – Ordnungsamt / Gewerbeamt"
+                        value={settings.regulatoryAuthority || ''}
+                        onChange={(e) => setSettings({ ...settings, regulatoryAuthority: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Berufshaftpflichtversicherung
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!isOwner}
+                        placeholder="z. B. Betriebshaftpflichtversicherung mit Deckung für Kinderspielbereiche (Geltungsbereich: Deutschland)"
+                        value={settings.liabilityInsurance || ''}
+                        onChange={(e) => setSettings({ ...settings, liabilityInsurance: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Verbraucherstreitbeilegung (OS-Plattform Klausel)
+                      </label>
+                      <textarea
+                        rows={2}
+                        disabled={!isOwner}
+                        value={settings.disputeResolutionNotice || ''}
+                        onChange={(e) => setSettings({ ...settings, disputeResolutionNotice: e.target.value })}
+                        placeholder="Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung bereit..."
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                        Zusätzliche Hausordnungs- &amp; AGB-Klauseln (im Impressum)
+                      </label>
+                      <textarea
+                        rows={2}
+                        disabled={!isOwner}
+                        value={settings.additionalLegalNotice || ''}
+                        onChange={(e) => setSettings({ ...settings, additionalLegalNotice: e.target.value })}
+                        placeholder="z. B. Besuch nur mit volljähriger Aufsichtsperson. Sockenpflicht im Spielbereich."
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Impressum Live Preview Box */}
+                <div className="pt-4 border-t border-slate-800">
+                  <div className="bg-slate-950 rounded-2xl p-6 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-sm text-white flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-sky-400" />
+                        Live-Vorschau: So erscheint dein Impressum für Kunden
+                      </span>
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+                        § 5 DDG Konform
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900/80 rounded-xl p-5 border border-slate-800 text-xs text-slate-300 space-y-3 font-sans leading-relaxed">
+                      <div>
+                        <strong className="text-white block font-bold text-sm">
+                          {settings.companyLegalName || settings.name}
+                        </strong>
+                        <span>Inhaber: {settings.ownerName || 'Mustafa Muhammed'}</span><br />
+                        <span>{settings.legalAddress || settings.address}</span>
+                      </div>
+
+                      <div>
+                        <strong className="text-white block font-bold">Kontakt:</strong>
+                        <span>Telefon: {settings.phone}</span><br />
+                        <span>E-Mail: {settings.email}</span>
+                      </div>
+
+                      <div>
+                        <strong className="text-white block font-bold">Umsatzsteuer-Identifikationsnummer:</strong>
+                        <span>{settings.taxId || 'DE (Beantragt / in Zuteilung)'}</span>
+                      </div>
+
+                      {settings.registerCourt && (
+                        <div>
+                          <strong className="text-white block font-bold">Registereintrag:</strong>
+                          <span>{settings.registerCourt} — {settings.registerNumber}</span>
+                        </div>
+                      )}
+
+                      {settings.regulatoryAuthority && (
+                        <div>
+                          <strong className="text-white block font-bold">Aufsichtsbehörde:</strong>
+                          <span>{settings.regulatoryAuthority}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* 2. Steuern & Register */}
-              <div className="pt-4 border-t border-slate-800 space-y-4">
-                <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" />
-                  2. Steuernummern &amp; Handelsregister
-                </h4>
+            {/* -------------------------------------------------------------
+                SUB-PAGE 2: DATENSCHUTZERKLÄRUNG (DSGVO / BDSG / TDDDG)
+                ------------------------------------------------------------- */}
+            {legalSubTab === 'datenschutz' && (
+              <div className="bg-slate-900/90 rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl space-y-6 animate-fadeIn">
+                <div className="border-b border-slate-800 pb-4">
+                  <h3 className="font-bold text-base text-white flex items-center gap-2 font-heading">
+                    <Shield className="w-5 h-5 text-sky-400" />
+                    Datenschutzerklärung &amp; Transparenz (EU-DSGVO, BDSG &amp; § 25 TDDDG)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Transparente Information über die Verarbeitung von Kundendaten, Buchungen und Server-Infrastruktur.
+                  </p>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Built-in compliance badge */}
+                <div className="p-4 bg-sky-950/40 border border-sky-800/60 rounded-xl flex items-start gap-3 text-sky-200 text-xs">
+                  <ShieldCheck className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Umsatzsteuer-Identifikationsnummer (USt-IdNr.)
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isOwner}
-                      placeholder="z. B. DE123456789 oder 'Beantragt / in Zuteilung'"
-                      value={settings.taxId || ''}
-                      onChange={(e) => setSettings({ ...settings, taxId: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Steuernummer (Finanzamt)
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isOwner}
-                      placeholder="z. B. 30/123/45678 (optional für Impressum)"
-                      value={settings.taxNumber || ''}
-                      onChange={(e) => setSettings({ ...settings, taxNumber: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Registergericht
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isOwner}
-                      placeholder="z. B. Amtsgericht Charlottenburg (Berlin)"
-                      value={settings.registerCourt || ''}
-                      onChange={(e) => setSettings({ ...settings, registerCourt: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Registernummer
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isOwner}
-                      placeholder="z. B. HRB 123456 B oder 'Gewerbeanmeldung vorliegend'"
-                      value={settings.registerNumber || ''}
-                      onChange={(e) => setSettings({ ...settings, registerNumber: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-mono"
-                    />
+                    <strong className="font-bold block text-white mb-0.5">Automatischer DSGVO-Grundschutz aktiv</strong>
+                    <span className="text-sky-300/80">
+                      Deine Plattform speichert Daten ausschließlich auf ISO-zertifizierten EU-Servern in Frankfurt am Main (Supabase). Für Buchungen werden datenschutzfreundliche UUID-Tokens ohne Kundenkonto-Zwang genutzt. Formulare sind über Cloudflare Turnstile vor Spam geschützt.
+                    </span>
                   </div>
                 </div>
-              </div>
-
-              {/* 3. Aufsichtsbehörden & Schlichtung */}
-              <div className="pt-4 border-t border-slate-800 space-y-4">
-                <h4 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  3. Aufsichtsbehörde &amp; Streitschlichtung
-                </h4>
 
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Zuständige Aufsichtsbehörde
+                      Datenschutzbeauftragter / Kontakt für Datenschutzanfragen (optional)
                     </label>
                     <input
                       type="text"
                       disabled={!isOwner}
-                      placeholder="z. B. Bezirksamt Mitte von Berlin – Ordnungsamt / Gewerbeamt"
-                      value={settings.regulatoryAuthority || ''}
-                      onChange={(e) => setSettings({ ...settings, regulatoryAuthority: e.target.value })}
+                      placeholder="z. B. Mustafa Muhammed (datenschutz@havenkidscafe.de)"
+                      value={settings.privacyDpoContact || ''}
+                      onChange={(e) => setSettings({ ...settings, privacyDpoContact: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Berufshaftpflichtversicherung
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!isOwner}
-                      placeholder="z. B. Betriebshaftpflichtversicherung mit Deckung für Kinderspielbereiche (Geltungsbereich: Deutschland)"
-                      value={settings.liabilityInsurance || ''}
-                      onChange={(e) => setSettings({ ...settings, liabilityInsurance: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Verbraucherstreitbeilegung (OS-Plattform Klausel)
-                    </label>
-                    <textarea
-                      rows={2}
-                      disabled={!isOwner}
-                      value={settings.disputeResolutionNotice || ''}
-                      onChange={(e) => setSettings({ ...settings, disputeResolutionNotice: e.target.value })}
-                      placeholder="Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung bereit..."
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 resize-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Zusätzliche Hausordnungs- &amp; AGB-Klauseln (im Impressum)
-                    </label>
-                    <textarea
-                      rows={2}
-                      disabled={!isOwner}
-                      value={settings.additionalLegalNotice || ''}
-                      onChange={(e) => setSettings({ ...settings, additionalLegalNotice: e.target.value })}
-                      placeholder="z. B. Besuch nur mit volljähriger Aufsichtsperson. Sockenpflicht im Spielbereich."
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 resize-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Impressum Live Preview Box */}
-              <div className="pt-4 border-t border-slate-800">
-                <div className="bg-slate-950 rounded-2xl p-6 border border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-sm text-white flex items-center gap-2">
-                      <Eye className="w-4 h-4 text-sky-400" />
-                      Live-Vorschau: So erscheint dein Impressum für Kunden
-                    </span>
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-                      § 5 DDG Konform
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      Wird in Abschnitt 1 der Datenschutzerklärung als gesonderter Ansprechpartner für Betroffenenrechte aufgeführt.
                     </span>
                   </div>
 
-                  <div className="bg-slate-900/80 rounded-xl p-5 border border-slate-800 text-xs text-slate-300 space-y-3 font-sans leading-relaxed">
-                    <div>
-                      <strong className="text-white block font-bold text-sm">
-                        {settings.companyLegalName || settings.name}
-                      </strong>
-                      <span>Inhaber: {settings.ownerName || 'Mustafa Muhammed'}</span><br />
-                      <span>{settings.legalAddress || settings.address}</span>
-                    </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-300">
+                        Individueller Text für die Datenschutzerklärung (Optional)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {isOwner && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const sample = `1. Verantwortliche Stelle:
+Verantwortlich für die Datenverarbeitung ist ${settings.companyLegalName || settings.name} (Inhaber: ${settings.ownerName || 'Mustafa Muhammed'}, ${settings.legalAddress || settings.address}). E-Mail: ${settings.email}.
 
-                    <div>
-                      <strong className="text-white block font-bold">Kontakt:</strong>
-                      <span>Telefon: {settings.phone}</span><br />
-                      <span>E-Mail: {settings.email}</span>
-                    </div>
+2. Buchungs- & Reservierungsdaten:
+Wir verarbeiten Name, E-Mail-Adresse, Telefonnummer sowie Anzahl der Kinder ausschließlich zur Durchführung von Besuchs-Reservierungen (Art. 6 Abs. 1 lit. b DSGVO).
 
-                    <div>
-                      <strong className="text-white block font-bold">Umsatzsteuer-Identifikationsnummer:</strong>
-                      <span>{settings.taxId || 'DE (Beantragt / in Zuteilung)'}</span>
-                    </div>
+3. Server-Infrastruktur & Cloudflare Turnstile:
+Die Datenhaltung erfolgt in EU-Rechenzentren (Frankfurt am Main). Formulare sind durch datenschutzfreundlichen Bot-Schutz geschützt.
 
-                    {settings.registerCourt && (
-                      <div>
-                        <strong className="text-white block font-bold">Registereintrag:</strong>
-                        <span>{settings.registerCourt} — {settings.registerNumber}</span>
+4. Betroffenenrechte:
+Du hast jederzeit das Recht auf Auskunft, Berichtigung oder Löschung deiner personenbezogenen Daten (Art. 15-21 DSGVO).`;
+                                setSettings({ ...settings, privacyCustomText: sample });
+                              }}
+                              className="text-[11px] font-bold text-sky-400 hover:text-sky-300 cursor-pointer underline"
+                            >
+                              Mustertext laden
+                            </button>
+                            {settings.privacyCustomText && (
+                              <button
+                                type="button"
+                                onClick={() => setSettings({ ...settings, privacyCustomText: '' })}
+                                className="text-[11px] font-bold text-rose-400 hover:text-rose-300 cursor-pointer underline"
+                              >
+                                Zurücksetzen
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
+                    <textarea
+                      rows={8}
+                      disabled={!isOwner}
+                      value={settings.privacyCustomText || ''}
+                      onChange={(e) => setSettings({ ...settings, privacyCustomText: e.target.value })}
+                      placeholder="Standardmäßig wird die gesetzeskonforme DSGVO-Erklärung automatisch generiert. Möchtest du zusätzliche Absätze ergänzen oder einen eigenen Text hinterlegen, trage ihn hier ein..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-sans leading-relaxed resize-y"
+                    />
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      Leer lassen, um die vollständige, automatisch rechtssichere Standard-Datenschutzerklärung der Website zu nutzen.
+                    </span>
+                  </div>
+                </div>
 
-                    {settings.regulatoryAuthority && (
-                      <div>
-                        <strong className="text-white block font-bold">Aufsichtsbehörde:</strong>
-                        <span>{settings.regulatoryAuthority}</span>
-                      </div>
-                    )}
+                {/* Datenschutz Live Preview Box */}
+                <div className="pt-4 border-t border-slate-800">
+                  <div className="bg-slate-950 rounded-2xl p-6 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-sm text-white flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-sky-400" />
+                        Live-Vorschau: Datenschutzerklärung
+                      </span>
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+                        DSGVO Konform
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900/80 rounded-xl p-5 border border-slate-800 text-xs text-slate-300 space-y-3 font-sans leading-relaxed max-h-64 overflow-y-auto">
+                      {settings.privacyCustomText ? (
+                        <div className="whitespace-pre-wrap">{settings.privacyCustomText}</div>
+                      ) : (
+                        <>
+                          <p>
+                            Wir nehmen den Schutz deiner persönlichen Daten und der Daten deiner Kinder sehr ernst. Wir behandeln personenbezogene Daten vertraulich und entsprechend den gesetzlichen Datenschutzvorschriften (EU-DSGVO, BDSG, TDDDG).
+                          </p>
+                          <div>
+                            <strong className="text-white block font-bold">1. Verantwortliche Stelle:</strong>
+                            <span>{settings.companyLegalName || settings.name}</span><br />
+                            <span>Inhaber: {settings.ownerName || 'Mustafa Muhammed'}</span><br />
+                            <span>{settings.legalAddress || settings.address}</span><br />
+                            <span>E-Mail: {settings.email} | Tel: {settings.phone}</span>
+                            {settings.privacyDpoContact && (
+                              <div className="mt-1 text-sky-400">
+                                <strong>Datenschutz-Kontakt:</strong> {settings.privacyDpoContact}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <strong className="text-white block font-bold">2. Server-Logfiles &amp; Backend:</strong>
+                            <span>Speicherung erfolgt in ISO-zertifizierten Rechenzentren in Frankfurt am Main (EU). Keine invasive Profilbildung.</span>
+                          </div>
+                          <div>
+                            <strong className="text-white block font-bold">3. Buchungsdaten &amp; Stornierungs-Token:</strong>
+                            <span>Erfassung erfolgt ausschließlich zur Durchführung und Bestätigung der Reservierung (Art. 6 Abs. 1 lit. b DSGVO).</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* -------------------------------------------------------------
+                SUB-PAGE 3: AGB & BESUCHSREGELN
+                ------------------------------------------------------------- */}
+            {legalSubTab === 'agb' && (
+              <div className="bg-slate-900/90 rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl space-y-6 animate-fadeIn">
+                <div className="border-b border-slate-800 pb-4">
+                  <h3 className="font-bold text-base text-white flex items-center gap-2 font-heading">
+                    <Scale className="w-5 h-5 text-sky-400" />
+                    AGB, Besuchsregeln &amp; Hausordnung
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Regelungen für Besuche, Stornierungsfristen, Spielbereich-Hygiene und Aufsichtspflicht (§ 832 BGB).
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      Stornierungsbedingungen &amp; Fristen *
+                    </label>
+                    <textarea
+                      rows={3}
+                      disabled={!isOwner}
+                      value={settings.cancellationNotice || ''}
+                      onChange={(e) => setSettings({ ...settings, cancellationNotice: e.target.value })}
+                      placeholder="z. B. Standard-Einzelbesuche & 10er-Block-Reservierungen können bis zu 2 Stunden vor Beginn kostenfrei online über den Token-Link storniert werden. Für Feiern gilt eine Frist von 48 Stunden."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-sans leading-relaxed resize-none"
+                    />
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      Wird Kunden bei der Buchung und im Bestätigungs-Bereich als verbindliche Frist angezeigt.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      Hausordnung, Sockenpflicht &amp; Aufsichtspflicht *
+                    </label>
+                    <textarea
+                      rows={4}
+                      disabled={!isOwner}
+                      value={settings.houseRulesNotice || ''}
+                      onChange={(e) => setSettings({ ...settings, houseRulesNotice: e.target.value })}
+                      placeholder="z. B. 1. Sockenpflicht im gesamten Spielbereich. 2. Keine Kinderbetreuung: Die gesetzliche Aufsichtspflicht verbleibt stets bei den Eltern..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-sans leading-relaxed resize-y"
+                    />
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      Wichtige Sicherheitsregeln für die Eltern und den Spielbereich.
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-300">
+                        Vollständiger individueller AGB-Text (Optional)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        {isOwner && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const sample = `1. Geltungsbereich:
+Diese AGB gelten für alle Reservierungen und den gesamten Aufenthalt in den Räumlichkeiten von ${settings.companyLegalName || settings.name} (Inhaber: ${settings.ownerName || 'Mustafa Muhammed'}, ${settings.legalAddress || settings.address}).
+
+2. Keine Kinderbetreuung & Aufsichtspflicht:
+Wir bieten keine Kinderbetreuung an. Die gesetzliche Aufsichtspflicht (§ 832 BGB) verbleibt während des gesamten Aufenthalts lückenlos bei den Eltern bzw. erwachsenen Begleitpersonen.
+
+3. Sockenpflicht:
+Im gesamten Spielbereich gilt ausnahmslos Sockenpflicht (rutschfeste Stopper-Socken empfohlen).
+
+4. Stornierungsfristen:
+${settings.cancellationNotice || 'Kostenfreie Online-Stornierung bis 2 Stunden vor Beginn für Standard-Termine.'}
+
+5. Gesundheit & Hygiene:
+Kindern und Begleitpersonen mit ansteckenden Infektionskrankheiten ist der Zutritt zum Schutz anderer Gäste untersagt.`;
+                                setSettings({ ...settings, termsCustomText: sample });
+                              }}
+                              className="text-[11px] font-bold text-sky-400 hover:text-sky-300 cursor-pointer underline"
+                            >
+                              Muster-AGB laden
+                            </button>
+                            {settings.termsCustomText && (
+                              <button
+                                type="button"
+                                onClick={() => setSettings({ ...settings, termsCustomText: '' })}
+                                className="text-[11px] font-bold text-rose-400 hover:text-rose-300 cursor-pointer underline"
+                              >
+                                Zurücksetzen
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <textarea
+                      rows={8}
+                      disabled={!isOwner}
+                      value={settings.termsCustomText || ''}
+                      onChange={(e) => setSettings({ ...settings, termsCustomText: e.target.value })}
+                      placeholder="Leer lassen, um die Standard-AGB mit den oben definierten Stornierungs- und Hausordnungsregeln zu nutzen..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs bg-slate-950 text-white focus:border-sky-500 font-sans leading-relaxed resize-y"
+                    />
+                  </div>
+                </div>
+
+                {/* AGB Live Preview Box */}
+                <div className="pt-4 border-t border-slate-800">
+                  <div className="bg-slate-950 rounded-2xl p-6 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-sm text-white flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-sky-400" />
+                        Live-Vorschau: AGB &amp; Besuchsregeln
+                      </span>
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+                        Kundenansicht
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900/80 rounded-xl p-5 border border-slate-800 text-xs text-slate-300 space-y-3 font-sans leading-relaxed max-h-64 overflow-y-auto">
+                      {settings.termsCustomText ? (
+                        <div className="whitespace-pre-wrap">{settings.termsCustomText}</div>
+                      ) : (
+                        <>
+                          <div>
+                            <strong className="text-white block font-bold">1. Geltungsbereich:</strong>
+                            <span>Gilt für {settings.companyLegalName || settings.name} ({settings.legalAddress || settings.address}).</span>
+                          </div>
+                          <div>
+                            <strong className="text-white block font-bold">2. Stornierungsbedingungen:</strong>
+                            <p className="mt-0.5 text-sky-300 font-medium">
+                              {settings.cancellationNotice || 'Kostenfreie Online-Stornierung bis zu 2 Stunden vor Beginn für Standard-Termine.'}
+                            </p>
+                          </div>
+                          <div>
+                            <strong className="text-white block font-bold">3. Hausordnung &amp; Aufsichtspflicht (§ 832 BGB):</strong>
+                            <div className="mt-0.5 whitespace-pre-line text-slate-300">
+                              {settings.houseRulesNotice || 'Keine Kinderbetreuung. Aufsichtspflicht liegt lückenlos bei den Eltern. Sockenpflicht im Spielbereich.'}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

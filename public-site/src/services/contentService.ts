@@ -32,6 +32,15 @@ export interface BusinessSettings {
   liabilityInsurance?: string;
   disputeResolutionNotice?: string;
   additionalLegalNotice?: string;
+
+  // Legal Information (Datenschutzerklärung DSGVO)
+  privacyDpoContact?: string;
+  privacyCustomText?: string;
+
+  // Legal Information (AGB & Besuchsregeln)
+  cancellationNotice?: string;
+  houseRulesNotice?: string;
+  termsCustomText?: string;
 }
 
 export interface SiteAnnouncement {
@@ -140,6 +149,15 @@ const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   liabilityInsurance: 'Gewerbliche Betriebshaftpflichtversicherung mit Deckung für Kinderspielbereiche',
   disputeResolutionNotice: 'Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.',
   additionalLegalNotice: '',
+
+  // Privacy Defaults (DSGVO)
+  privacyDpoContact: '',
+  privacyCustomText: '',
+
+  // AGB & Besuchsregeln Defaults
+  cancellationNotice: 'Kostenfreie Online-Stornierung bis zu 2 Stunden vor Beginn für Standard-Termine. Für Kindergeburtstage und Gruppenfeiern gilt eine Frist von mindestens 48 Stunden.',
+  houseRulesNotice: '1. Sockenpflicht im gesamten Spielbereich (rutschfeste Socken empfohlen).\n2. Speisen & Getränke dürfen ausschließlich im Cafébereich verzehrt werden.\n3. Keine Kinderbetreuung: Die gesetzliche Aufsichtspflicht (§ 832 BGB) verbleibt stets bei den Begleitpersonen.\n4. Kindern mit ansteckenden Infektionskrankheiten ist der Zutritt zum Schutz anderer untersagt.',
+  termsCustomText: '',
 };
 
 /**
@@ -239,6 +257,15 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
       liabilityInsurance: (map.get('liability_insurance') as string) || DEFAULT_BUSINESS_SETTINGS.liabilityInsurance,
       disputeResolutionNotice: (map.get('dispute_resolution_notice') as string) || DEFAULT_BUSINESS_SETTINGS.disputeResolutionNotice,
       additionalLegalNotice: (map.get('additional_legal_notice') as string) || DEFAULT_BUSINESS_SETTINGS.additionalLegalNotice,
+
+      // Legal Fields Mapping (Datenschutzerklärung DSGVO)
+      privacyDpoContact: (map.get('privacy_dpo_contact') as string) || DEFAULT_BUSINESS_SETTINGS.privacyDpoContact,
+      privacyCustomText: (map.get('privacy_custom_text') as string) || DEFAULT_BUSINESS_SETTINGS.privacyCustomText,
+
+      // Legal Fields Mapping (AGB & Besuchsregeln)
+      cancellationNotice: (map.get('cancellation_notice') as string) || DEFAULT_BUSINESS_SETTINGS.cancellationNotice,
+      houseRulesNotice: (map.get('house_rules_notice') as string) || DEFAULT_BUSINESS_SETTINGS.houseRulesNotice,
+      termsCustomText: (map.get('terms_custom_text') as string) || DEFAULT_BUSINESS_SETTINGS.termsCustomText,
     };
   } catch {
     return DEFAULT_BUSINESS_SETTINGS;

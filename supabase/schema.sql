@@ -210,6 +210,7 @@ DECLARE
     v_cancellation_token UUID;
     v_booking_id UUID;
     v_start_time VARCHAR(10);
+    v_end_time VARCHAR(10);
     v_calculated_price NUMERIC(10, 2);
     v_clean_name VARCHAR(150);
     v_clean_email VARCHAR(150);
@@ -290,15 +291,25 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error_message', 'Ungültige Anzahl an Begleitpersonen (0-10 erlaubt).');
     END IF;
 
-    -- Extract start time for time-of-day checks and slot matching
+    -- Extract start & end times for time-of-day checks and slot matching
     v_start_time := trim(split_part(p_time_slot, '-', 1));
+    v_end_time := trim(split_part(p_time_slot, '-', 2));
 
-    -- Timezone-Aware Same-Day Past Time Check
-    IF p_date = v_today_berlin AND (v_start_time || ':00')::time <= (timezone('Europe/Berlin', now()))::time THEN
-        RETURN jsonb_build_object(
-            'success', false,
-            'error_message', 'Dieser Zeitslot liegt heute bereits in der Vergangenheit.'
-        );
+    -- Timezone-Aware Same-Day Past Time Check (booking allowed while slot is ongoing; expires only after slot end time)
+    IF v_end_time IS NOT NULL AND v_end_time != '' THEN
+        IF p_date = v_today_berlin AND (v_end_time || ':00')::time <= (timezone('Europe/Berlin', now()))::time THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error_message', 'Dieser Zeitslot ist für heute bereits abgelaufen.'
+            );
+        END IF;
+    ELSE
+        IF p_date = v_today_berlin AND (v_start_time || ':00')::time <= (timezone('Europe/Berlin', now()))::time THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error_message', 'Dieser Zeitslot ist für heute bereits abgelaufen.'
+            );
+        END IF;
     END IF;
 
     -- 4. Validate Package Exists and is Active (Database-Controlled)

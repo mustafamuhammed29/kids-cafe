@@ -76,6 +76,15 @@ export interface AdminBusinessSettings {
   liabilityInsurance?: string;
   disputeResolutionNotice?: string;
   additionalLegalNotice?: string;
+
+  // Legal Information (Datenschutzerklärung & DSGVO)
+  privacyDpoContact?: string;
+  privacyCustomText?: string;
+
+  // Legal Information (AGB & Besuchsregeln)
+  cancellationNotice?: string;
+  houseRulesNotice?: string;
+  termsCustomText?: string;
 }
 
 export interface AdminPackage {

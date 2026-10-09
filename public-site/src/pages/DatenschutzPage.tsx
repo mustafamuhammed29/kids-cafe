@@ -1,13 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, ArrowLeft } from 'lucide-react';
 import { BUSINESS_INFO } from '../data/mockData';
+import { getBusinessSettings, type BusinessSettings } from '../services/contentService';
 import { usePageSeo } from '../hooks/usePageSeo';
 
 export const DatenschutzPage: React.FC = () => {
+  const [settings, setSettings] = useState<BusinessSettings | null>(null);
+
+  useEffect(() => {
+    getBusinessSettings().then((data) => setSettings(data));
+  }, []);
+
+  const companyName = settings?.companyLegalName || settings?.name || BUSINESS_INFO.name;
+  const owner = settings?.ownerName || BUSINESS_INFO.owner;
+  const address = settings?.legalAddress || settings?.address || BUSINESS_INFO.address;
+  const email = settings?.email || BUSINESS_INFO.email;
+  const phone = settings?.phone || BUSINESS_INFO.phone;
+  const phoneClean = settings?.phoneClean || BUSINESS_INFO.phoneClean;
+  const dpo = settings?.privacyDpoContact;
+  const customText = settings?.privacyCustomText;
+
   usePageSeo({
-    title: 'Datenschutzerklärung | Haven Kids Café Berlin',
-    description: 'Informationen zur Verarbeitung personenbezogener Daten gemäß EU-DSGVO, BDSG und § 25 TDDDG im Haven Kids Café Berlin.',
+    title: `Datenschutzerklärung | ${companyName}`,
+    description: `Informationen zur Verarbeitung personenbezogener Daten gemäß EU-DSGVO, BDSG und § 25 TDDDG im ${companyName}.`,
     canonicalPath: '/datenschutz',
   });
 
@@ -59,24 +75,36 @@ export const DatenschutzPage: React.FC = () => {
 
           {/* Content Body */}
           <div className="p-8 sm:p-10 text-sm text-gray-700 space-y-6 leading-relaxed">
-            <p>
-              Wir nehmen den Schutz deiner persönlichen Daten und der Daten deiner Kinder sehr ernst. Wir behandeln personenbezogene Daten vertraulich und entsprechend den gesetzlichen Datenschutzvorschriften (EU-DSGVO, BDSG, TDDDG) sowie dieser Datenschutzerklärung.
-            </p>
-
-            <div className="space-y-6">
-              <div>
-                <h2 className="font-extrabold text-base text-dark mb-1.5">
-                  1. Verantwortliche Stelle
-                </h2>
-                <p>
-                  Verantwortlich für die Datenverarbeitung auf dieser Website ist:<br />
-                  <strong>{BUSINESS_INFO.name}</strong><br />
-                  Inhaber: {BUSINESS_INFO.owner}<br />
-                  {BUSINESS_INFO.address}<br />
-                  E-Mail: <a href={`mailto:${BUSINESS_INFO.email}`} className="text-primary hover:underline font-medium">{BUSINESS_INFO.email}</a><br />
-                  Telefon: <a href={`tel:${BUSINESS_INFO.phoneClean}`} className="text-primary hover:underline font-medium">{BUSINESS_INFO.phone}</a>
-                </p>
+            {customText ? (
+              <div className="whitespace-pre-line leading-relaxed text-gray-800 space-y-4">
+                {customText}
               </div>
+            ) : (
+              <>
+                <p>
+                  Wir nehmen den Schutz deiner persönlichen Daten und der Daten deiner Kinder sehr ernst. Wir behandeln personenbezogene Daten vertraulich und entsprechend den gesetzlichen Datenschutzvorschriften (EU-DSGVO, BDSG, TDDDG) sowie dieser Datenschutzerklärung.
+                </p>
+
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="font-extrabold text-base text-dark mb-1.5">
+                      1. Verantwortliche Stelle
+                    </h2>
+                    <p>
+                      Verantwortlich für die Datenverarbeitung auf dieser Website ist:<br />
+                      <strong>{companyName}</strong><br />
+                      Inhaber: {owner}<br />
+                      {address}<br />
+                      E-Mail: <a href={`mailto:${email}`} className="text-primary hover:underline font-medium">{email}</a><br />
+                      Telefon: <a href={`tel:${phoneClean}`} className="text-primary hover:underline font-medium">{phone}</a>
+                      {dpo && (
+                        <>
+                          <br />
+                          <strong>Datenschutzbeauftragter / Datenschutz-Kontakt:</strong> {dpo}
+                        </>
+                      )}
+                    </p>
+                  </div>
 
               <div>
                 <h2 className="font-extrabold text-base text-dark mb-1.5">
@@ -194,11 +222,13 @@ export const DatenschutzPage: React.FC = () => {
                   • <strong>Recht auf Einschränkung der Verarbeitung (Art. 18 DSGVO)</strong>.<br />
                   • <strong>Recht auf Datenübertragbarkeit (Art. 20 DSGVO)</strong>.<br />
                   • <strong>Recht auf Widerspruch (Art. 21 DSGVO)</strong> gegen Verarbeitungen auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO.<br />
-                  • <strong>Widerruf von Einwilligungen:</strong> Du kannst erteilte Einwilligungen (z. B. Marketing) jederzeit formlos mit Wirkung für die Zukunft per E-Mail an <a href={`mailto:${BUSINESS_INFO.email}`} className="text-primary hover:underline font-semibold">{BUSINESS_INFO.email}</a> widerrufen.<br />
+                  • <strong>Widerruf von Einwilligungen:</strong> Du kannst erteilte Einwilligungen (z. B. Marketing) jederzeit formlos mit Wirkung für die Zukunft per E-Mail an <a href={`mailto:${email}`} className="text-primary hover:underline font-semibold">{email}</a> widerrufen.<br />
                   • <strong>Beschwerderecht bei einer Aufsichtsbehörde (Art. 77 DSGVO):</strong> Zuständig für Berlin ist die Berliner Beauftragte für Datenschutz und Informationsfreiheit, Alt-Moabit 59-61, 10555 Berlin.
                 </p>
               </div>
             </div>
+            </>
+          )}
           </div>
         </div>
       </div>

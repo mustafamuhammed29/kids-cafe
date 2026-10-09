@@ -1,13 +1,27 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Scale, ArrowLeft } from 'lucide-react';
 import { BUSINESS_INFO } from '../data/mockData';
+import { getBusinessSettings, type BusinessSettings } from '../services/contentService';
 import { usePageSeo } from '../hooks/usePageSeo';
 
 export const AgbPage: React.FC = () => {
+  const [settings, setSettings] = useState<BusinessSettings | null>(null);
+
+  useEffect(() => {
+    getBusinessSettings().then((data) => setSettings(data));
+  }, []);
+
+  const companyName = settings?.companyLegalName || settings?.name || BUSINESS_INFO.name;
+  const owner = settings?.ownerName || BUSINESS_INFO.owner;
+  const address = settings?.legalAddress || settings?.address || BUSINESS_INFO.address;
+  const cancellationNotice = settings?.cancellationNotice;
+  const houseRulesNotice = settings?.houseRulesNotice;
+  const termsCustomText = settings?.termsCustomText;
+
   usePageSeo({
-    title: 'AGB & Hausordnung | Haven Kids Café Berlin',
-    description: 'Allgemeine Geschäftsbedingungen, Besuchsregeln, Aufsichtspflicht und Stornierungsbedingungen im Haven Kids Café Berlin.',
+    title: `AGB & Hausordnung | ${companyName}`,
+    description: `Allgemeine Geschäftsbedingungen, Besuchsregeln, Aufsichtspflicht und Stornierungsbedingungen im ${companyName}.`,
     canonicalPath: '/agb',
   });
 
@@ -59,47 +73,59 @@ export const AgbPage: React.FC = () => {
 
           {/* Content Body */}
           <div className="p-8 sm:p-10 text-sm text-gray-700 space-y-6 leading-relaxed">
-            <p>
-              Willkommen im Haven Kids Café. Bitte lies dir unsere Allgemeinen Geschäfts-, Buchungs- und Besuchsbedingungen sorgfältig durch. Sie regeln das Vertragsverhältnis und sorgen für die Sicherheit aller großen und kleinen Gäste.
-            </p>
-
-            <div className="space-y-6">
-              <div>
-                <h2 className="font-extrabold text-base text-dark mb-1.5">
-                  1. Geltungsbereich &amp; Vertragspartner
-                </h2>
-                <p>
-                  Diese Allgemeinen Geschäftsbedingungen (AGB) gelten für alle Verträge, Reservierungen und den gesamten Aufenthalt in den Räumlichkeiten von {BUSINESS_INFO.name} (Inhaber: {BUSINESS_INFO.owner}, {BUSINESS_INFO.address}). Mit Betreten der Räumlichkeiten oder Abschluss einer Online-Reservierung werden diese Bedingungen verbindlich anerkannt.
-                </p>
+            {termsCustomText ? (
+              <div className="whitespace-pre-line leading-relaxed text-gray-800 space-y-4">
+                {termsCustomText}
               </div>
-
-              <div>
-                <h2 className="font-extrabold text-base text-dark mb-1.5">
-                  2. Vertragsschluss &amp; Reservierungsprozess
-                </h2>
+            ) : (
+              <>
                 <p>
-                  Die Präsentation unserer Leistungen auf der Website stellt kein bindendes Angebot dar. Durch Absenden des Buchungsformulars gibt der Kunde ein verbindliches Angebot zur Reservierung eines Besuchs-Zeitslots ab. Der Vertrag kommt mit der automatisierten Übermittlung der Buchungsbestätigung per E-Mail zustande.
+                  Willkommen im {companyName}. Bitte lies dir unsere Allgemeinen Geschäfts-, Buchungs- und Besuchsbedingungen sorgfältig durch. Sie regeln das Vertragsverhältnis und sorgen für die Sicherheit aller großen und kleinen Gäste.
                 </p>
-              </div>
 
-              <div>
-                <h2 className="font-extrabold text-base text-dark mb-1.5">
-                  3. Preise, Steuern &amp; Zahlungsmodalitäten
-                </h2>
-                <p>
-                  Alle angegebenen Preise sind Endpreise in Euro inklusive der jeweils geltenden gesetzlichen Mehrwertsteuer. Bei Standard-Besuchen erfolgt keine Online-Vorauszahlung; der Eintrittspreis wird vor Ort beim Check-in vor Betreten der Spielbereiche fällig. Wir akzeptieren Barzahlung, EC-/Girocard, gängige Kreditkarten sowie kontaktlose Zahlungsverfahren.
-                </p>
-              </div>
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="font-extrabold text-base text-dark mb-1.5">
+                      1. Geltungsbereich &amp; Vertragspartner
+                    </h2>
+                    <p>
+                      Diese Allgemeinen Geschäftsbedingungen (AGB) gelten für alle Verträge, Reservierungen und den gesamten Aufenthalt in den Räumlichkeiten von {companyName} (Inhaber: {owner}, {address}). Mit Betreten der Räumlichkeiten oder Abschluss einer Online-Reservierung werden diese Bedingungen verbindlich anerkannt.
+                    </p>
+                  </div>
 
-              <div>
-                <h2 className="font-extrabold text-base text-dark mb-1.5">
-                  4. Stornierungsbedingungen &amp; Fristen
-                </h2>
-                <p>
-                  • <strong>Standard-Einzelbesuche &amp; 10er-Block-Reservierungen:</strong> Eine kostenfreie Stornierung ist bis zu <strong>genau 2 Stunden vor Beginn</strong> des gebuchten Zeitfensters über den persönlichen Stornierungs-Link aus der Bestätigungs-E-Mail möglich. Bei späterer Stornierung oder unangekündigtem Nichterscheinen behält sich das Café vor, den reservierten Platz nach 15 Minuten Verspätung für wartende Familien freizugeben. Eine automatisierte Umbuchungs- bzw. Terminverschiebungsfunktion besteht nicht; nach einer Stornierung kann jederzeit ein neuer freier Termin gebucht werden.<br />
-                  • <strong>Kindergeburtstage &amp; Gruppenfeiern:</strong> Für exklusiv reservierte Geburtstagstische und Gruppen-Pakete mit gesonderter Vorbereitung gilt eine Stornierungsfrist von mindestens 48 Stunden vor Veranstaltungsbeginn in Textform (E-Mail oder WhatsApp).
-                </p>
-              </div>
+                  <div>
+                    <h2 className="font-extrabold text-base text-dark mb-1.5">
+                      2. Vertragsschluss &amp; Reservierungsprozess
+                    </h2>
+                    <p>
+                      Die Präsentation unserer Leistungen auf der Website stellt kein bindendes Angebot dar. Durch Absenden des Buchungsformulars gibt der Kunde ein verbindliches Angebot zur Reservierung eines Besuchs-Zeitslots ab. Der Vertrag kommt mit der automatisierten Übermittlung der Buchungsbestätigung per E-Mail zustande.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h2 className="font-extrabold text-base text-dark mb-1.5">
+                      3. Preise, Steuern &amp; Zahlungsmodalitäten
+                    </h2>
+                    <p>
+                      Alle angegebenen Preise sind Endpreise in Euro inklusive der jeweils geltenden gesetzlichen Mehrwertsteuer. Bei Standard-Besuchen erfolgt keine Online-Vorauszahlung; der Eintrittspreis wird vor Ort beim Check-in vor Betreten der Spielbereiche fällig. Wir akzeptieren Barzahlung, EC-/Girocard, gängige Kreditkarten sowie kontaktlose Zahlungsverfahren.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h2 className="font-extrabold text-base text-dark mb-1.5">
+                      4. Stornierungsbedingungen &amp; Fristen
+                    </h2>
+                    {cancellationNotice ? (
+                      <p className="p-4 rounded-xl bg-sky-50 border border-sky-100 text-sky-950 font-medium">
+                        {cancellationNotice}
+                      </p>
+                    ) : (
+                      <p>
+                        • <strong>Standard-Einzelbesuche &amp; 10er-Block-Reservierungen:</strong> Eine kostenfreie Stornierung ist bis zu <strong>genau 2 Stunden vor Beginn</strong> des gebuchten Zeitfensters über den persönlichen Stornierungs-Link aus der Bestätigungs-E-Mail möglich. Bei späterer Stornierung oder unangekündigtem Nichterscheinen behält sich das Café vor, den reservierten Platz nach 15 Minuten Verspätung für wartende Familien freizugeben. Eine automatisierte Umbuchungs- bzw. Terminverschiebungsfunktion besteht nicht; nach einer Stornierung kann jederzeit ein neuer freier Termin gebucht werden.<br />
+                        • <strong>Kindergeburtstage &amp; Gruppenfeiern:</strong> Für exklusiv reservierte Geburtstagstische und Gruppen-Pakete mit gesonderter Vorbereitung gilt eine Stornierungsfrist von mindestens 48 Stunden vor Veranstaltungsbeginn in Textform (E-Mail oder WhatsApp).
+                      </p>
+                    )}
+                  </div>
 
               <div>
                 <h2 className="font-extrabold text-base text-dark mb-1.5">
@@ -115,7 +141,7 @@ export const AgbPage: React.FC = () => {
                   6. Keine Kinderbetreuung &amp; Gesetzliche Aufsichtspflicht
                 </h2>
                 <p>
-                  {BUSINESS_INFO.name} ist ein familienorientiertes Spielcafé und bietet <strong>ausdrücklich keine Kinderbetreuung oder Beaufsichtigung</strong> an. Die gesetzliche Aufsichtspflicht (§ 832 BGB) verbleibt während des gesamten Aufenthalts lückenlos und uneingeschränkt bei den anwesenden Eltern bzw. den erwachsenen Begleitpersonen (Mindestalter 18 Jahre). Kinder dürfen die Räumlichkeiten zu keinem Zeitpunkt ohne Aufsichtsperson betreten oder verlassen.
+                  {companyName} ist ein familienorientiertes Spielcafé und bietet <strong>ausdrücklich keine Kinderbetreuung oder Beaufsichtigung</strong> an. Die gesetzliche Aufsichtspflicht (§ 832 BGB) verbleibt während des gesamten Aufenthalts lückenlos und uneingeschränkt bei den anwesenden Eltern bzw. den erwachsenen Begleitpersonen (Mindestalter 18 Jahre). Kinder dürfen die Räumlichkeiten zu keinem Zeitpunkt ohne Aufsichtsperson betreten oder verlassen.
                 </p>
               </div>
 
@@ -130,11 +156,17 @@ export const AgbPage: React.FC = () => {
 
               <div>
                 <h2 className="font-extrabold text-base text-dark mb-1.5">
-                  8. Hygiene, Sockenpflicht &amp; Sauberkeit
+                  8. Hygiene, Sockenpflicht &amp; Besuchsregeln
                 </h2>
-                <p>
-                  Aus strengen Hygiene- und Sicherheitsgründen gilt im gesamten Spielbereich und im Salzraum <strong>strikte Sockenpflicht</strong> (idealerweise rutschfeste Stoppersocken) für Kinder und erwachsene Begleitpersonen. Das Betreten mit Straßenschuhen oder barfuß ist untersagt. Rutschfeste Socken können bei Bedarf am Empfang erworben werden.
-                </p>
+                {houseRulesNotice ? (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 font-medium whitespace-pre-line leading-relaxed">
+                    {houseRulesNotice}
+                  </div>
+                ) : (
+                  <p>
+                    Aus strengen Hygiene- und Sicherheitsgründen gilt im gesamten Spielbereich und im Salzraum <strong>strikte Sockenpflicht</strong> (idealerweise rutschfeste Stoppersocken) für Kinder und erwachsene Begleitpersonen. Das Betreten mit Straßenschuhen oder barfuß ist untersagt. Rutschfeste Socken können bei Bedarf am Empfang erworben werden.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -142,7 +174,7 @@ export const AgbPage: React.FC = () => {
                   9. Haftungsbeschränkung
                 </h2>
                 <p>
-                  {BUSINESS_INFO.name} haftet unbeschränkt für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit sowie für vorsätzliche oder grob fahrlässige Pflichtverletzungen. Für einfache Fahrlässigkeit haftet das Café nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf den vertragstypischen, vorhersehbaren Schaden. Für den Verlust oder die Beschädigung mitgebrachter Gegenstände, Kleidung, Wertsachen oder Kinderwagen im Eingangsbereich wird keine Haftung übernommen.
+                  {companyName} haftet unbeschränkt für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit sowie für vorsätzliche oder grob fahrlässige Pflichtverletzungen. Für einfache Fahrlässigkeit haftet das Café nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf den vertragstypischen, vorhersehbaren Schaden. Für den Verlust oder die Beschädigung mitgebrachter Gegenstände, Kleidung, Wertsachen oder Kinderwagen im Eingangsbereich wird keine Haftung übernommen.
                 </p>
               </div>
 
@@ -151,7 +183,7 @@ export const AgbPage: React.FC = () => {
                   10. Hausrecht &amp; Verweisung
                 </h2>
                 <p>
-                  Die Mitarbeiter von {BUSINESS_INFO.name} üben das Hausrecht aus. Den Anweisungen des Personals ist unverzüglich Folge zu leisten. Bei groben Verstößen gegen diese Besuchsregeln, Gefährdung anderer Gäste oder mutwilliger Sachbeschädigung kann ein sofortiger Verweis aus den Räumlichkeiten ausgesprochen werden. Ein Anspruch auf Erstattung bereits entrichteter Eintrittsgelder besteht in diesem Fall nicht.
+                  Die Mitarbeiter von {companyName} üben das Hausrecht aus. Den Anweisungen des Personals ist unverzüglich Folge zu leisten. Bei groben Verstößen gegen diese Besuchsregeln, Gefährdung anderer Gäste oder mutwilliger Sachbeschädigung kann ein sofortiger Verweis aus den Räumlichkeiten ausgesprochen werden. Ein Anspruch auf Erstattung bereits entrichteter Eintrittsgelder besteht in diesem Fall nicht.
                 </p>
               </div>
 
@@ -173,6 +205,8 @@ export const AgbPage: React.FC = () => {
                 </div>
               </div>
             </div>
+            </>
+          )}
           </div>
         </div>
       </div>

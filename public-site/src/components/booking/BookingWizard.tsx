@@ -57,18 +57,45 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
     return dateStr < getTodayLocalDate();
   };
 
-  // Helper: Check if a specific slot on a given date has already passed
-  const isSlotInPast = (dateStr: string, slotStartTime: string, bufferMinutes = 0): boolean => {
-    if (!dateStr || !slotStartTime) return false;
+  // Helper: Check if a specific slot on a given date has already ended.
+  // Allows booking while slot is ongoing (between start and end time),
+  // and only locks/expires the slot once its END time has passed (after 12:00).
+  const isSlotInPast = (
+    dateStr: string,
+    slot: { endTime?: string; startTime?: string } | string,
+    bufferMinutes = 0
+  ): boolean => {
+    if (!dateStr || !slot) return false;
     const today = getTodayLocalDate();
     if (dateStr < today) return true;
     if (dateStr > today) return false;
 
-    // Same day: check start time against current local time
+    // Same day: check against the slot's END time (or fallback to start time if missing)
+    const timeStr = typeof slot === 'string' ? slot : (slot.endTime || slot.startTime || '');
+    if (!timeStr) return false;
+
     const now = new Date();
-    const [slotH, slotM] = slotStartTime.split(':').map(Number);
-    const slotDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), slotH || 0, slotM || 0, 0);
-    return slotDate.getTime() <= (now.getTime() + bufferMinutes * 60 * 1000);
+    const [slotH, slotM] = timeStr.split(':').map(Number);
+    const slotEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), slotH || 0, slotM || 0, 0);
+    return slotEndDate.getTime() <= (now.getTime() + bufferMinutes * 60 * 1000);
+  };
+
+  // Helper: Check if a slot is currently ongoing right now (today, between startTime and endTime)
+  const isSlotCurrentlyActive = (
+    dateStr: string,
+    slot: { startTime: string; endTime: string }
+  ): boolean => {
+    if (!dateStr || !slot?.startTime || !slot?.endTime) return false;
+    const today = getTodayLocalDate();
+    if (dateStr !== today) return false;
+
+    const now = new Date();
+    const [startH, startM] = slot.startTime.split(':').map(Number);
+    const [endH, endM] = slot.endTime.split(':').map(Number);
+    const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH || 0, startM || 0, 0);
+    const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH || 0, endM || 0, 0);
+
+    return now.getTime() >= startDate.getTime() && now.getTime() < endDate.getTime();
   };
 
   // Default date to tomorrow in local time
@@ -142,12 +169,12 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
             match &&
             match.isActive &&
             match.availableCount > 0 &&
-            !isSlotInPast(selectedDate, match.startTime);
+            !isSlotInPast(selectedDate, match);
 
           const nextSlot =
             isMatchValid
               ? match
-              : data.find((s) => s.isActive && s.availableCount > 0 && !isSlotInPast(selectedDate, s.startTime)) || null;
+              : data.find((s) => s.isActive && s.availableCount > 0 && !isSlotInPast(selectedDate, s)) || null;
 
           if (nextSlot) {
             const free =
@@ -284,8 +311,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       return;
     }
 
-    if (isSlotInPast(selectedDate, selectedSlot.startTime)) {
-      setSubmitError('Der gewählte Zeitslot liegt heute bereits in der Vergangenheit. Bitte wähle einen zukünftigen Zeitslot.');
+    if (isSlotInPast(selectedDate, selectedSlot)) {
+      setSubmitError('Dieser Zeitslot ist für heute bereits abgelaufen. Bitte wähle einen anderen Zeitslot.');
       return;
     }
 
@@ -625,7 +652,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                   <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center text-amber-800 text-xs font-semibold">
                     Für dieses Datum sind derzeit keine buchbaren Zeitslots verfügbar. Bitte wähle ein anderes Datum.
                   </div>
-                ) : slotsList.every((s) => isSlotInPast(selectedDate, s.startTime)) ? (
+                ) : slotsList.every((s) => isSlotInPast(selectedDate, s)) ? (
                   <div className="p-6 sm:p-8 rounded-2xl bg-amber-50 border-2 border-amber-200 text-center space-y-3 shadow-xs">
                     <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto shadow-inner">
                       <Clock className="w-6 h-6" />
@@ -645,7 +672,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {slotsList.map((slot) => {
-                      const isPast = isSlotInPast(selectedDate, slot.startTime);
+                      const isPast = isSlotInPast(selectedDate, slot);
+                      const isCurrentlyActive = isSlotCurrentlyActive(selectedDate, slot);
                       const isSelected = selectedSlot?.startTime === slot.startTime || selectedSlot?.id === slot.id;
                       const isFull = slot.bookedCount >= slot.maxCapacity || slot.availableCount <= 0;
                       const isDeactivated = slot.isActive === false;
@@ -662,8 +690,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                               // Sync children count if current count exceeds slot's remaining free capacity
                               const slotFree =
                                 typeof slot.availableCount === 'number'
-                                  ? slot.availableCount
-                                  : slot.maxCapacity - slot.bookedCount;
+                                    ? slot.availableCount
+                                    : slot.maxCapacity - slot.bookedCount;
                               const slotCap = slot.maxCapacity || BUSINESS_INFO.maxSlotCapacity || 20;
                               const maxAllowedForSlot = Math.max(1, Math.min(slotCap, slotFree > 0 ? slotFree : 1));
                               if (childrenCount > maxAllowedForSlot) {
@@ -700,6 +728,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                               <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-100 text-rose-600">
                                 Ausgebucht
                               </span>
+                            ) : isCurrentlyActive ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                Jetzt buchbar ({slot.availableCount} frei)
+                              </span>
                             ) : slot.availableCount <= 2 ? (
                               <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
                                 Nur noch {slot.availableCount} {slot.availableCount === 1 ? 'Platz' : 'Plätze'} frei
@@ -712,7 +744,13 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                           </div>
 
                           <span className="text-[11px] text-slate-400 block mt-1 border-t border-slate-100 w-full pt-1">
-                            {isPast ? 'Zeit abgelaufen' : isBlocked ? 'Nicht verfügbar' : 'danach 30m Lüftung'}
+                            {isPast
+                              ? 'Zeit abgelaufen'
+                              : isCurrentlyActive
+                              ? 'Läuft gerade – Buchung offen'
+                              : isBlocked
+                              ? 'Nicht verfügbar'
+                              : 'danach 30m Lüftung'}
                           </span>
                         </button>
                       );
@@ -725,7 +763,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 const currentMatch = slotsList.find(
                   (s) => s.startTime === selectedSlot?.startTime || s.id === selectedSlot?.id
                 );
-                const isSelectedPast = selectedSlot ? isSlotInPast(selectedDate, selectedSlot.startTime) : false;
+                const isSelectedPast = selectedSlot ? isSlotInPast(selectedDate, selectedSlot) : false;
                 const isDatePast = isDateInPast(selectedDate);
                 const isSelectedBlocked =
                   isDateBlocked ||
