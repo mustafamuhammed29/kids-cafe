@@ -531,6 +531,13 @@ serve(async (req: Request) => {
 </html>
       `;
 
+      // Send via Resend with graceful fallback and error logging
+      const configuredFrom = Deno.env.get('RESEND_FROM_EMAIL') || 'Haven Kids Café <buchung@havenkidscafe.de>';
+      const isOwnerTesting = validated.email.toLowerCase() === 'jansatech.alsafi@gmail.com';
+      const senderToUse = (!configuredFrom.includes('buchung@havenkidscafe.de') || !isOwnerTesting) 
+        ? configuredFrom 
+        : 'Haven Kids Café <onboarding@resend.dev>';
+
       fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -538,14 +545,39 @@ serve(async (req: Request) => {
           Authorization: `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: 'Haven Kids Café <buchung@havenkidscafe.de>',
+          from: senderToUse,
           to: [validated.email],
           subject: `Deine Buchungsbestätigung #${rpcResult.reference_code} — Haven Kids Café`,
           html: emailHtml,
         }),
-      }).catch((emailErr) => {
-        console.error('[EMAIL ERROR] Failed to send confirmation email:', emailErr);
-      });
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const errBody = await res.text();
+            console.warn(`[RESEND_WARNING] Email send returned status ${res.status}:`, errBody);
+            // If custom domain unverified and owner is booking, try onboarding@resend.dev fallback
+            if (isOwnerTesting && senderToUse !== 'Haven Kids Café <onboarding@resend.dev>') {
+              fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${RESEND_API_KEY}`,
+                },
+                body: JSON.stringify({
+                  from: 'Haven Kids Café <onboarding@resend.dev>',
+                  to: [validated.email],
+                  subject: `[TEST] Deine Buchungsbestätigung #${rpcResult.reference_code} — Haven Kids Café`,
+                  html: emailHtml,
+                }),
+              }).catch(() => {});
+            }
+          } else {
+            console.info(`[RESEND_SUCCESS] Confirmation email dispatched to ${validated.email}`);
+          }
+        })
+        .catch((emailErr) => {
+          console.error('[EMAIL ERROR] Failed to send confirmation email:', emailErr);
+        });
     }
 
     // 11. Minimal Safe Customer Response (NEVER INCLUDES CANCELLATION TOKEN)

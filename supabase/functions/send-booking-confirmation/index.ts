@@ -176,21 +176,45 @@ serve(async (req: Request) => {
 </html>
     `;
 
-    const resendResponse = await fetch('https://api.resend.com/emails', {
+    const configuredFrom = Deno.env.get('RESEND_FROM_EMAIL') || 'Haven Kids Café <buchung@havenkidscafe.de>';
+    const isOwnerTesting = b.customer_email.toLowerCase() === 'jansatech.alsafi@gmail.com';
+    let senderToUse = configuredFrom;
+
+    let resendResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Haven Kids Café <buchung@havenkidscafe.de>',
+        from: senderToUse,
         to: [b.customer_email],
         subject: `Deine Buchungsbestätigung #${b.reference_code} — Haven Kids Café`,
         html: htmlContent,
       }),
     });
 
-    const resendData = await resendResponse.json();
+    let resendData = await resendResponse.json();
+
+    // If custom domain failed (e.g. 403 unverified) and recipient is the owner testing, try with onboarding@resend.dev
+    if (!resendResponse.ok && isOwnerTesting && senderToUse !== 'Haven Kids Café <onboarding@resend.dev>') {
+      const fallbackResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: 'Haven Kids Café <onboarding@resend.dev>',
+          to: [b.customer_email],
+          subject: `[TEST] Deine Buchungsbestätigung #${b.reference_code} — Haven Kids Café`,
+          html: htmlContent,
+        }),
+      });
+      if (fallbackResponse.ok) {
+        resendData = await fallbackResponse.json();
+      }
+    }
 
     return new Response(JSON.stringify({ success: true, resendData }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
