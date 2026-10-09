@@ -251,13 +251,13 @@ export async function submitBooking(
   }
 
   if (formData.date === todayStr) {
-    const [h, m] = slot.startTime.split(':').map(Number);
+    const [h, m] = (slot.endTime || slot.startTime).split(':').map(Number);
     const slotDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h || 0, m || 0);
     if (slotDate.getTime() <= now.getTime()) {
       return {
         success: false,
         referenceCode: '',
-        error: 'Dieser Zeitslot liegt heute bereits in der Vergangenheit. Bitte wähle einen zukünftigen Zeitslot.',
+        error: 'Dieser Zeitslot ist für heute bereits abgelaufen. Bitte wähle einen zukünftigen Zeitslot.',
       };
     }
   }
